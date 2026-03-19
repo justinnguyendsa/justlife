@@ -1,62 +1,66 @@
 import { useCallback } from 'react';
-import type { Habit, HabitLog, HabitFrequency, HabitCategory } from '../types';
-import { useLocalStorage } from './useLocalStorage';
-
-const HABITS_KEY = 'justlife_habits';
-const LOGS_KEY = 'justlife_habit_logs';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db';
+import type { Habit, HabitFrequency, HabitCategory } from '../types';
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
 export const useHabitStore = () => {
-  const [habits, setHabits] = useLocalStorage<Habit[]>(HABITS_KEY, []);
-  const [logs, setLogs] = useLocalStorage<HabitLog[]>(LOGS_KEY, []);
+  const liveHabits = useLiveQuery(() => db.habits.toArray());
+  const habits = liveHabits ?? [];
 
-  const addHabit = useCallback((
-    name: string,
-    icon: string,
-    color: string,
-    frequency: HabitFrequency,
-    category: HabitCategory,
-    description = '',
-    targetDays: number[] = []
-  ) => {
-    const newHabit: Habit = {
-      id: crypto.randomUUID(),
-      name,
-      description,
-      icon,
-      color,
-      frequency,
-      category,
-      targetDays,
-      createdAt: Date.now(),
-      archived: false,
-    };
-    setHabits((prev) => [...prev, newHabit]);
-  }, [setHabits]);
+  const liveLogs = useLiveQuery(() => db.habitLogs.toArray());
+  const logs = liveLogs ?? [];
 
-  const deleteHabit = useCallback((id: string) => {
-    setHabits((prev) => prev.filter((h) => h.id !== id));
-    setLogs((prev) => prev.filter((l) => l.habitId !== id));
-  }, [setHabits, setLogs]);
+  const addHabit = useCallback(
+    async (
+      name: string,
+      icon: string,
+      color: string,
+      frequency: HabitFrequency,
+      category: HabitCategory,
+      description = '',
+      targetDays: number[] = []
+    ) => {
+      const newHabit: Habit = {
+        id: crypto.randomUUID(),
+        name,
+        description,
+        icon,
+        color,
+        frequency,
+        category,
+        targetDays,
+        createdAt: Date.now(),
+        archived: false,
+      };
+      await db.habits.add(newHabit);
+    },
+    []
+  );
 
-  const archiveHabit = useCallback((id: string) => {
-    setHabits((prev) => prev.map((h) => h.id === id ? { ...h, archived: true } : h));
-  }, [setHabits]);
-
-  const toggleLog = useCallback((habitId: string, date: string) => {
-    setLogs((prev) => {
-      const existing = prev.find((l) => l.habitId === habitId && l.date === date);
-      if (existing) {
-        return prev.map((l) =>
-          l.habitId === habitId && l.date === date
-            ? { ...l, done: !l.done }
-            : l
-        );
-      }
-      return [...prev, { habitId, date, done: true }];
+  const deleteHabit = useCallback(async (id: string) => {
+    await db.transaction('rw', db.habits, db.habitLogs, async () => {
+      await db.habits.delete(id);
+      // Delete all logs for this habit
+      const logsToDelete = await db.habitLogs.where({ habitId: id }).primaryKeys();
+      await db.habitLogs.bulkDelete(logsToDelete);
     });
-  }, [setLogs]);
+  }, []);
+
+  const archiveHabit = useCallback(async (id: string) => {
+    await db.habits.update(id, { archived: true });
+  }, []);
+
+  const toggleLog = useCallback(async (habitId: string, date: string) => {
+    const logId = `${habitId}_${date}`;
+    const existing = await db.habitLogs.get(logId);
+    if (existing) {
+      await db.habitLogs.update(logId, { done: !existing.done });
+    } else {
+      await db.habitLogs.add({ id: logId, habitId, date, done: true });
+    }
+  }, []);
 
   const isDone = useCallback((habitId: string, date: string): boolean => {
     return logs.some((l) => l.habitId === habitId && l.date === date && l.done);
@@ -77,15 +81,18 @@ export const useHabitStore = () => {
     return streak;
   }, [logs]);
 
-  const getCompletedDaysInMonth = useCallback((habitId: string, year: number, month: number): string[] => {
-    return logs
-      .filter((l) => {
-        if (l.habitId !== habitId || !l.done) return false;
-        const [y, m] = l.date.split('-').map(Number);
-        return y === year && m === month;
-      })
-      .map((l) => l.date);
-  }, [logs]);
+  const getCompletedDaysInMonth = useCallback(
+    (habitId: string, year: number, month: number): string[] => {
+      return logs
+        .filter((l) => {
+          if (l.habitId !== habitId || !l.done) return false;
+          const [y, m] = l.date.split('-').map(Number);
+          return y === year && m === month;
+        })
+        .map((l) => l.date);
+    },
+    [logs]
+  );
 
   const getTodayCompleted = useCallback((): number => {
     const today = todayStr();

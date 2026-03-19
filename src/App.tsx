@@ -7,6 +7,7 @@ import FocusPage from './pages/FocusPage';
 import SettingsPage from './pages/SettingsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import HabitPage from './pages/HabitPage';
+import TeachingPage from './pages/TeachingPage';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="focus" element={<FocusPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="habits" element={<HabitPage />} />
+          <Route path="teaching" element={<TeachingPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

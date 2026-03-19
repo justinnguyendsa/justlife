@@ -41,3 +41,35 @@ export interface HabitLog {
   done: boolean;
   note?: string;
 }
+
+// ─── TEACHING HUB MODELS ────────────────────────────────────────────────────────
+export interface Class {
+  id: string; // uuid
+  name: string; // e.g. "Toán ứng dụng K1"
+  courseCode: string; // e.g. "MATH101"
+  description?: string;
+  scheduleRules: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  createdAt: number;
+}
+
+export interface Student {
+  id: string; // uuid
+  classId: string; // link to Class
+  name: string;
+  studentCode: string;
+  email?: string;
+  phone?: string;
+  status: 'ACTIVE' | 'DROPPED';
+  joinedAt: number;
+}
+
+export interface Attendance {
+  id: string; // uuid
+  classId: string;
+  studentId: string;
+  date: string; // YYYY-MM-DD (ngày điểm danh)
+  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
+  note?: string;
+}
