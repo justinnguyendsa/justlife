@@ -6,6 +6,8 @@ export interface UserSettings {
   enableNotifications: boolean;
   theme: 'dark';
   geminiApiKey: string;
+  telegramToken: string;
+  telegramChatId: string;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -13,6 +15,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   enableNotifications: false,
   theme: 'dark',
   geminiApiKey: '',
+  telegramToken: '',
+  telegramChatId: '',
 };
 
 export const useSettingsStore = () => {

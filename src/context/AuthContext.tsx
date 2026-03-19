@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  onAuthStateChanged, 
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  onAuthStateChanged,
   signOut,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -35,15 +35,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Lấy role từ Firestore
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
           let role: UserRole = 'user';
-          
+
           if (userDoc.exists()) {
             role = userDoc.data().role as UserRole;
           } else {
-            // Check if this is the first user (for local dev convenience)
-            if (firebaseUser.email === 'admin@justlife.com' || firebaseUser.uid === 'some-hardcoded-id') {
-               role = 'super_admin'; 
-            }
-            
+            // Mọi user mới mặc định là 'user'. 
+            // Bạn có thể đổi quyền Super Admin trực tiếp trong Firebase Console > Firestore cho tài khoản đầu tiên.
+            role = 'user'; 
+
             try {
               await setDoc(doc(db, "users", firebaseUser.uid), {
                 email: firebaseUser.email,
@@ -52,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 createdAt: Date.now()
               });
             } catch (fsError) {
-              console.warn("Firestore setDoc failed, proceeding with default role:", fsError);
+              console.warn("Firestore setDoc failed:", fsError);
             }
           }
 
@@ -97,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (email: string, pass: string, name: string) => {
     const res = await createUserWithEmailAndPassword(auth, email, pass);
     await updateProfile(res.user, { displayName: name });
-    
+
     // Khởi tạo user trong Firestore
     await setDoc(doc(db, "users", res.user.uid), {
       email,

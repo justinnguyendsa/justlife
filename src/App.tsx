@@ -12,6 +12,7 @@ import { WorkingPage } from './pages/WorkingPage';
 import SettingsPage from './pages/SettingsPage';
 import { AuthPage } from './pages/AuthPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { useNotificationEngine } from './hooks/useNotificationEngine';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -32,38 +33,47 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AppContent = () => {
+  // Kích hoạt engine thông báo ngầm
+  useNotificationEngine();
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public Route */}
+        <Route path="/login" element={<AuthPage />} />
+
+        {/* Protected Routes */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<DashboardPage />} />
+          <Route path="tasks" element={<TasksPage />} />
+          <Route path="calendar" element={<CalendarPage />} />
+          <Route path="focus" element={<FocusPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="habits" element={<HabitPage />} />
+          <Route path="teaching" element={<Navigate to="/teaching/classes" replace />} />
+          <Route path="teaching/:tab" element={<TeachingPage />} />
+          <Route path="studying" element={<Navigate to="/studying/courses" replace />} />
+          <Route path="studying/:tab" element={<StudyingPage />} />
+          <Route path="working" element={<Navigate to="/working/projects" replace />} />
+          <Route path="working/:tab" element={<WorkingPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Route */}
-          <Route path="/login" element={<AuthPage />} />
-
-          {/* Protected Routes */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<DashboardPage />} />
-            <Route path="tasks" element={<TasksPage />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="focus" element={<FocusPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="habits" element={<HabitPage />} />
-            <Route path="teaching" element={<Navigate to="/teaching/classes" replace />} />
-            <Route path="teaching/:tab" element={<TeachingPage />} />
-            <Route path="studying" element={<Navigate to="/studying/courses" replace />} />
-            <Route path="studying/:tab" element={<StudyingPage />} />
-            <Route path="working" element={<Navigate to="/working/projects" replace />} />
-            <Route path="working/:tab" element={<WorkingPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <AppContent />
     </AuthProvider>
   );
 }
