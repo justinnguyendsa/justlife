@@ -1,5 +1,6 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 type NavItem = {
   to?: string;
@@ -95,7 +96,14 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   // Mở menu group dựa theo route hiện tại
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
@@ -206,11 +214,33 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 mt-auto">
-        <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
-          <p className="text-xs text-slate-500 text-center">
-            ✨ Quản lý cuộc sống,<br />bắt đầu từ hôm nay.
+      {/* User & Logout */}
+      <div className="p-4 mt-auto space-y-3">
+        {user && (
+          <div className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-white/[0.03] border border-white/5">
+             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-indigo-500/20">
+                {user.avatar ? (
+                  <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                ) : user.name.charAt(0).toUpperCase()}
+             </div>
+             <div className="flex-1 overflow-hidden">
+                <p className="text-xs font-bold text-white truncate">{user.name}</p>
+                <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+             </div>
+          </div>
+        )}
+        
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all group"
+        >
+          <svg className="w-4 h-4 transition-colors group-hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          Đăng xuất
+        </button>
+
+        <div className="p-3 rounded-xl bg-slate-800/20 border border-slate-700/30">
+          <p className="text-[10px] text-slate-600 text-center italic">
+            JustLife Security Protocol v15
           </p>
         </div>
       </div>
