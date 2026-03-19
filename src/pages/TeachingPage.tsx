@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTeachingStore } from '../hooks/useTeachingStore';
 import DateInput from '../components/ui/DateInput';
-// import Badge from '../components/ui/Badge';
-import type { Class, Student, Assignment, Submission, TeachingDoc, Attendance } from '../types';
+import { readImportFile, parsePastedText, autoDetectMapping, type RawImportData } from '../utils/importHelpers';
+import type { Class, Student, Submission, TeachingDoc, Assignment, Attendance } from '../types';
 
 // Utility to generate session dates
 function generateSessions(startStr: string, endStr: string, daysOfWeek: number[]) {
@@ -33,14 +33,27 @@ export default function TeachingPage() {
 
   const {
     classes, students, assignments, submissions, attendances, teachingDocs,
-    addClass, deleteClass, addStudent, deleteStudent, addAssignment,
-    updateSubmission, toggleAttendance, addDocument, deleteDocument,
+    addClass, updateClass, deleteClass, addStudent, updateStudent, bulkAddStudents, deleteStudent, addAssignment, updateAssignment, deleteAssignment,
+    updateSubmission, toggleAttendance, addDocument, updateDocument, deleteDocument,
     assignStudentToClass, removeStudentFromClass, assignDocToClass, removeDocFromClass
   } = store;
 
   const [showModal, setShowModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [activeTab, setActiveTab] = useState<'STUDENTS' | 'ASSIGNMENTS' | 'ATTENDANCE' | 'DOCUMENTS'>('STUDENTS');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
+  const [importData, setImportData] = useState('');
+  const [rawData, setRawData] = useState<RawImportData | null>(null);
+  const [fieldMapping, setFieldMapping] = useState({ name: '', studentCode: '', email: '' });
+  const [importPreview, setImportPreview] = useState<Array<{ name: string, studentCode: string, email?: string }>>([]);
+
+  // Editing States
+  const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [editingDoc, setEditingDoc] = useState<TeachingDoc | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'CLASS' | 'STUDENT' | 'ASG' | 'DOC', name: string } | null>(null);
 
   // Forms
   const [name, setName] = useState('');
@@ -109,6 +122,54 @@ export default function TeachingPage() {
     setDocTitle(''); setDocUrl(''); setDocDesc('');
   };
 
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const data = await readImportFile(file);
+      setRawData(data);
+      const mapping = autoDetectMapping(data.headers);
+      setFieldMapping(mapping as any);
+      setImportStep(2);
+    } catch (err) {
+      alert('Lỗi đọc file: ' + err);
+    }
+  };
+
+  const handleTextImport = () => {
+    if (!importData.trim()) return;
+    const data = parsePastedText(importData);
+    setRawData(data);
+    const mapping = autoDetectMapping(data.headers);
+    setFieldMapping(mapping as any);
+    setImportStep(2);
+  };
+
+  const applyMapping = () => {
+    if (!rawData) return;
+    const mapped = rawData.rows.map(row => ({
+      name: row[fieldMapping.name] || 'Chưa rõ',
+      studentCode: row[fieldMapping.studentCode] || `ID_${Math.floor(Math.random() * 10000)}`,
+      email: row[fieldMapping.email] || ''
+    }));
+    setImportPreview(mapped);
+    setImportStep(3);
+  };
+
+  const execImport = async () => {
+    if (importPreview.length === 0) return;
+    await bulkAddStudents(importPreview, selectedClass?.id);
+    resetImport();
+  };
+
+  const resetImport = () => {
+    setShowImportModal(false);
+    setImportStep(1);
+    setImportData('');
+    setRawData(null);
+    setImportPreview([]);
+  };
+
   // Class assign handlers
   const handleAssignOrCreateStudentInClass = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,6 +228,7 @@ export default function TeachingPage() {
           </div>
         </div>
         {mainTab === 'CLASSES' && <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/25 text-sm transition-all whitespace-nowrap">+ Thêm Lớp</button>}
+        {mainTab === 'STUDENTS' && <button onClick={() => setShowImportModal(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-indigo-500/25 text-sm transition-all whitespace-nowrap">📥 Import Học Viên</button>}
       </header>
 
       {/* ----------- MAIN TAB: CLASSES (TABLE VIEW) ----------- */}
@@ -200,8 +262,9 @@ export default function TeachingPage() {
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex justify-end gap-2 pr-2">
-                        <button onClick={(e) => { e.stopPropagation(); setSelectedClass(cls); setActiveTab('ATTENDANCE'); }} className="p-2 text-slate-500 hover:text-amber-400 bg-slate-800/50 rounded-lg">📋</button>
-                        <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Xoá lớp học này?')) deleteClass(cls.id) }} className="p-2 text-slate-500 hover:text-red-400 bg-slate-800/50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={(e) => { e.stopPropagation(); setEditingClass(cls); }} className="p-2 text-slate-500 hover:text-blue-400 bg-slate-800/50 rounded-lg transition-all" title="Sửa lớp học">✏️</button>
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedClass(cls); setActiveTab('ATTENDANCE'); }} className="p-2 text-slate-500 hover:text-amber-400 bg-slate-800/50 rounded-lg" title="Điểm danh">📋</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: cls.id, type: 'CLASS', name: cls.name }); }} className="p-2 text-slate-500 hover:text-red-400 bg-slate-800/50 rounded-lg transition-all" title="Xóa">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
                       </div>
@@ -259,9 +322,12 @@ export default function TeachingPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button onClick={() => { if (window.confirm('Xóa sinh viên này?')) deleteStudent(s.id) }} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => setEditingStudent(s)} className="p-2 text-slate-500 hover:text-blue-400 transition-all" title="Sửa">✏️</button>
+                          <button onClick={() => setDeleteConfirm({ id: s.id, type: 'STUDENT', name: s.name })} className="p-2 text-slate-500 hover:text-red-400 transition-all" title="Xóa">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -324,9 +390,12 @@ export default function TeachingPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button onClick={() => { if (window.confirm('Xóa tài liệu này?')) deleteDocument(d.id) }} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => setEditingDoc(d)} className="p-2 text-slate-500 hover:text-blue-400 transition-all" title="Sửa">✏️</button>
+                          <button onClick={() => setDeleteConfirm({ id: d.id, type: 'DOC', name: d.title })} className="p-2 text-slate-500 hover:text-red-400 transition-all" title="Xóa">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -375,7 +444,10 @@ export default function TeachingPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-1">
                     <div className="bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/20 shadow-lg sticky top-0">
-                      <h3 className="text-sm font-bold text-indigo-300 mb-5 flex items-center gap-2"><span>➕</span> Thêm vào Lớp</h3>
+                      <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-sm font-bold text-indigo-300 flex items-center gap-2"><span>➕</span> Thêm vào Lớp</h3>
+                        <button onClick={() => setShowImportModal(true)} className="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded border border-indigo-500/30 hover:bg-indigo-500/40 font-bold uppercase">Import</button>
+                      </div>
                       <form onSubmit={handleAssignOrCreateStudentInClass} className="space-y-4">
                         <div>
                           <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Chọn từ Pool gốc</label>
@@ -426,9 +498,12 @@ export default function TeachingPage() {
                                 </div>
                               </td>
                               <td className="px-5 py-4 text-right">
-                                <button onClick={() => removeStudentFromClass(s.id, selectedClass.id)} className="text-[10px] font-bold uppercase tracking-tight px-3 py-1.5 rounded-lg border border-slate-700 text-slate-500 hover:text-red-400 hover:border-red-500/50 transition-all opacity-0 group-hover:opacity-100">
-                                  Gỡ khỏi Lớp
-                                </button>
+                                <div className="flex justify-end gap-2 pr-2">
+                                  <button onClick={() => setEditingStudent(s)} className="p-2 text-slate-500 hover:text-blue-400 transition-all" title="Sửa học viên">✏️</button>
+                                  <button onClick={() => { if (window.confirm('Gỡ học viên này khỏi lớp?')) removeStudentFromClass(s.id, selectedClass.id) }} className="text-[10px] font-bold uppercase tracking-tight px-3 py-1.5 rounded-lg border border-slate-700 text-slate-500 hover:text-red-400 hover:border-red-500/50 transition-all">
+                                    Gỡ khỏi Lớp
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -522,12 +597,16 @@ export default function TeachingPage() {
                       return (
                         <div key={asg.id} className="bg-slate-950/40 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
                           <header className="p-5 bg-slate-800/40 border-b border-slate-800 flex justify-between items-center">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 flex-1">
                               <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400">📝</div>
                               <div>
                                 <h4 className="text-xl font-black text-slate-100">{asg.title}</h4>
                                 <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-widest">Hạn: <span className="text-amber-500">{new Date(asg.dueDate).toLocaleDateString()}</span></p>
                               </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => setEditingAssignment(asg)} className="p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-blue-400 rounded-xl transition-all" title="Sửa bài tập">✏️</button>
+                              <button onClick={() => setDeleteConfirm({ id: asg.id, type: 'ASG', name: asg.title })} className="p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 rounded-xl transition-all" title="Xóa">🗑️</button>
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center">
@@ -620,9 +699,12 @@ export default function TeachingPage() {
                                 {doc.description && <p className="text-xs text-slate-500 mt-1">{doc.description}</p>}
                               </td>
                               <td className="px-6 py-4 text-right pr-6">
-                                <button onClick={() => removeDocFromClass(doc.id, selectedClass.id)} className="text-[10px] font-bold uppercase tracking-tighter px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                                  Gỡ khỏi Lớp
-                                </button>
+                                <div className="flex justify-end gap-2 items-center">
+                                  <button onClick={() => setEditingDoc(doc)} className="p-2 text-slate-500 hover:text-blue-400 transition-all" title="Sửa tài liệu">✏️</button>
+                                  <button onClick={() => { if (window.confirm('Gỡ tài liệu này khỏi lớp?')) removeDocFromClass(doc.id, selectedClass.id) }} className="text-[10px] font-bold uppercase tracking-tighter px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/50 rounded-lg transition-all">
+                                    Gỡ khỏi Lớp
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -693,6 +775,373 @@ export default function TeachingPage() {
           </div>
         </div>
       )}
+      {/* Bulk Import Modal - Sprint 20 Refactored */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-[32px] w-full max-w-5xl shadow-3xl overflow-hidden flex flex-col max-h-[90vh]">
+             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+               <div className="flex items-center gap-4">
+                 <div className="w-10 h-10 bg-indigo-600/20 rounded-xl flex items-center justify-center text-indigo-400 font-bold border border-indigo-500/30">
+                   {importStep}
+                 </div>
+                 <div>
+                   <h2 className="text-xl font-black text-slate-100 flex items-center gap-3">📥 Nhập Học Viên {selectedClass && <span className="text-blue-400 font-mono text-xs">» {selectedClass.courseCode}</span>}</h2>
+                   <div className="flex gap-4 mt-1">
+                      <span className={`text-[9px] font-black uppercase tracking-tighter ${importStep >= 1 ? 'text-indigo-400' : 'text-slate-600'}`}>1. Tải lên</span>
+                      <span className="text-slate-700">/</span>
+                      <span className={`text-[9px] font-black uppercase tracking-tighter ${importStep >= 2 ? 'text-indigo-400' : 'text-slate-600'}`}>2. Ánh xạ (Mapping)</span>
+                      <span className="text-slate-700">/</span>
+                      <span className={`text-[9px] font-black uppercase tracking-tighter ${importStep >= 3 ? 'text-indigo-400' : 'text-slate-600'}`}>3. Hoàn tất</span>
+                   </div>
+                 </div>
+               </div>
+               <button onClick={resetImport} className="text-slate-500 hover:text-white text-3xl font-light">&times;</button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                {importStep === 1 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="space-y-6">
+                      <div className="bg-slate-950/50 border-2 border-dashed border-slate-800 rounded-[28px] p-10 flex flex-col items-center justify-center text-center group hover:border-indigo-500/50 transition-all cursor-pointer relative">
+                        <input type="file" accept=".xlsx,.xls,.csv,.json" onChange={handleFileImport} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        <div className="w-20 h-20 bg-slate-800 rounded-[24px] flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform">📄</div>
+                        <h3 className="text-slate-200 font-black text-lg mb-2">Chọn tệp tin</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed font-bold">Hỗ trợ .xlsx, .csv, .json<br/>Kéo thả file vào đây để bắt đầu</p>
+                      </div>
+                      
+                      <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/10 flex items-center gap-3 text-blue-400">
+                        <span className="text-xl">💡</span>
+                        <p className="text-[10px] font-bold leading-tight uppercase">Mẹo: Bạn có thể chọn toàn bộ vùng trong Excel/Sheets và dán vào ô bên cạnh để import nhanh hơn.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="block text-xs font-bold text-slate-400 mb-1 ml-1 uppercase">Hoặc dán văn bản từ Spreadsheet</label>
+                      <textarea 
+                        value={importData} 
+                        onChange={e => setImportData(e.target.value)} 
+                        placeholder="Nguyễn Văn A	SV001&#10;Trần Thị B	SV002"
+                        className="w-full h-64 bg-slate-950/50 border border-slate-800 rounded-[24px] p-6 text-sm text-slate-100 font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all placeholder:text-slate-800"
+                      />
+                      <button onClick={handleTextImport} disabled={!importData.trim()} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black transition-all shadow-xl shadow-indigo-600/30">🔍 XỬ LÝ VĂN BẢN</button>
+                    </div>
+                  </div>
+                )}
+
+                {importStep === 2 && rawData && (
+                  <div className="animate-in slide-in-from-right-4 duration-300 max-w-3xl mx-auto space-y-8">
+                     <div className="text-center space-y-2">
+                        <h3 className="text-2xl font-black text-white">📏 Ánh xạ trường dữ liệu</h3>
+                        <p className="text-sm text-slate-500 font-bold">Hãy chọn các cột tương ứng từ dữ liệu của bạn để chúng tôi hiểu đúng.</p>
+                     </div>
+
+                     <div className="grid grid-cols-1 gap-6 bg-slate-950/30 p-8 rounded-[32px] border border-slate-800">
+                        {[
+                          { label: 'Tên học viên', field: 'name', emoji: '👤' },
+                          { label: 'Mã số học viên', field: 'studentCode', emoji: '🆔' },
+                          { label: 'Địa chỉ Email', field: 'email', emoji: '📧' }
+                        ].map(item => (
+                          <div key={item.field} className="grid grid-cols-2 items-center gap-8">
+                            <div className="p-4 bg-slate-900 rounded-2xl flex items-center gap-4 border border-slate-800">
+                               <span className="text-xl">{item.emoji}</span>
+                               <span className="text-xs font-black text-slate-300 uppercase">{item.label}</span>
+                            </div>
+                            <select 
+                              value={fieldMapping[item.field as keyof typeof fieldMapping]}
+                              onChange={(e) => setFieldMapping({...fieldMapping, [item.field]: e.target.value})}
+                              className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-slate-100 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                            >
+                               <option value="">-- [Bỏ qua trường này] --</option>
+                               {rawData.headers.map(h => <option key={h} value={h}>{h}</option>)}
+                            </select>
+                          </div>
+                        ))}
+                     </div>
+
+                     <div className="flex gap-4">
+                        <button onClick={() => setImportStep(1)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-700 transition-all">← Quay lại</button>
+                        <button onClick={applyMapping} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-500 shadow-xl shadow-blue-600/20 transition-all">Tiếp tục →</button>
+                     </div>
+                  </div>
+                )}
+
+                {importStep === 3 && (
+                  <div className="animate-in zoom-in-95 duration-300 space-y-6">
+                      <div className="flex items-center justify-between">
+                         <h3 className="text-lg font-black text-white">✨ Preview: Sẵn sàng nhập {importPreview.length} học viên</h3>
+                         <button onClick={() => setImportStep(2)} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 underline decoration-indigo-500/30">Thay đổi Mapping</button>
+                      </div>
+
+                      <div className="border border-slate-800 rounded-[32px] bg-slate-950/40 overflow-hidden shadow-2xl">
+                         <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-900 text-slate-500 uppercase font-black tracking-widest border-b border-slate-800">
+                               <tr>
+                                  <th className="px-6 py-5">Họ tên</th>
+                                  <th className="px-6 py-5">Mã SV</th>
+                                  <th className="px-6 py-5">Email</th>
+                                  <th className="px-6 py-5 text-right">Hành động</th>
+                               </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/50">
+                               {importPreview.map((p, i) => (
+                                 <tr key={i} className="hover:bg-white/5 transition-colors group">
+                                    <td className="px-6 py-4 font-black text-slate-200">{p.name}</td>
+                                    <td className="px-6 py-4 font-mono text-blue-400 font-bold">{p.studentCode}</td>
+                                    <td className="px-6 py-4 text-slate-400">{p.email || <span className="text-slate-800 italic">- trống -</span>}</td>
+                                    <td className="px-6 py-4 text-right">
+                                       <button onClick={() => setImportPreview(prev => prev.filter((_, idx) => idx !== i))} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-500/10 transition-all opacity-20 group-hover:opacity-100">✕</button>
+                                    </td>
+                                 </tr>
+                               ))}
+                            </tbody>
+                         </table>
+                      </div>
+
+                      <div className="p-6 bg-slate-900 border border-slate-800 rounded-[32px] flex gap-4">
+                        <button onClick={() => setImportStep(2)} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-bold transition-all">THAY ĐỔI MAPPING</button>
+                        <button onClick={execImport} disabled={importPreview.length === 0} className="flex-[2] py-4 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-black shadow-xl shadow-green-600/30 transition-all">XÁC NHẬN LƯU VÀO HỆ THỐNG</button>
+                      </div>
+                  </div>
+                   )}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Edit Modals rendered as separate components to avoid hook mismatch in parent */}
+      {editingClass && (
+        <EditClassModal 
+          isOpen={!!editingClass} 
+          classData={editingClass} 
+          onClose={() => setEditingClass(null)} 
+          onUpdate={updateClass} 
+        />
+      )}
+      {editingStudent && (
+        <EditStudentModal 
+          isOpen={!!editingStudent} 
+          studentData={editingStudent} 
+          onClose={() => setEditingStudent(null)} 
+          onUpdate={updateStudent} 
+        />
+      )}
+      {editingAssignment && (
+        <EditAssignmentModal 
+          isOpen={!!editingAssignment} 
+          assignmentData={editingAssignment} 
+          onClose={() => setEditingAssignment(null)} 
+          onUpdate={updateAssignment} 
+        />
+      )}
+      {editingDoc && (
+        <EditDocModal 
+          isOpen={!!editingDoc} 
+          docData={editingDoc} 
+          onClose={() => setEditingDoc(null)} 
+          onUpdate={updateDocument} 
+        />
+      )}
+      {deleteConfirm && (
+        <DeleteConfirmModal 
+          isOpen={!!deleteConfirm}
+          data={deleteConfirm}
+          onClose={() => setDeleteConfirm(null)}
+          onConfirm={async () => {
+             if (deleteConfirm.type === 'CLASS') await deleteClass(deleteConfirm.id);
+             if (deleteConfirm.type === 'STUDENT') await deleteStudent(deleteConfirm.id);
+             if (deleteConfirm.type === 'ASG') await deleteAssignment(deleteConfirm.id);
+             if (deleteConfirm.type === 'DOC') await deleteDocument(deleteConfirm.id);
+             setDeleteConfirm(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DeleteConfirmModal({ isOpen, data, onClose, onConfirm }: { isOpen: boolean, data: { id: string, type: string, name: string }, onClose: () => void, onConfirm: () => Promise<void> }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/90 backdrop-blur-lg p-4 animate-in fade-in duration-300">
+      <div className="bg-slate-900 border border-red-500/20 rounded-[32px] w-full max-w-sm shadow-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="p-8 text-center space-y-6">
+          <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center text-4xl mx-auto border border-red-500/20 shadow-inner">🗑️</div>
+          <div>
+            <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">Xác nhận xóa?</h3>
+            <p className="text-sm text-slate-400 leading-relaxed font-bold">Bạn có chắc muốn xóa <span className="text-red-400">"{data.name}"</span>? Thao tác này không thể hoàn tác.</p>
+          </div>
+          <div className="flex gap-4 pt-2">
+            <button onClick={onClose} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-bold transition-all uppercase tracking-widest text-[10px]">Huỷ</button>
+            <button onClick={onConfirm} className="flex-[2] py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-black shadow-xl shadow-red-600/30 transition-all uppercase tracking-widest text-[10px]">Xác nhận xóa</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Separate components to isolate hooks and logic
+function EditClassModal({ isOpen, classData, onClose, onUpdate }: { isOpen: boolean, classData: Class, onClose: () => void, onUpdate: (id: string, partial: Partial<Class>) => Promise<void> }) {
+  const [data, setData] = useState<Class>({...classData});
+  if (!isOpen) return null;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onUpdate(data.id, { name: data.name, courseCode: data.courseCode, scheduleRules: data.scheduleRules });
+    onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700 rounded-[32px] w-full max-w-xl shadow-3xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+          <h2 className="text-xl font-black text-slate-100 italic">🔧 Chỉnh sửa Lớp học</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tên lớp học</label>
+              <input value={data.name} onChange={e => setData({...data, name: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+               <div>
+                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Mã học phần</label>
+                 <input value={data.courseCode} onChange={e => setData({...data, courseCode: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" required />
+               </div>
+               <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Lịch dạy (0=CN, 1=T2...)</label>
+                  <div className="flex gap-1">
+                    {[1,2,3,4,5,6,0].map(d => (
+                       <button key={d} type="button" onClick={() => setData({...data, scheduleRules: data.scheduleRules.includes(d) ? data.scheduleRules.filter(x => x !== d) : [...data.scheduleRules, d]})} 
+                         className={`w-8 h-8 rounded-lg text-[10px] font-bold transition-all ${data.scheduleRules.includes(d) ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-500'}`}>{d === 0 ? 'CN' : d+1}</button>
+                    ))}
+                  </div>
+               </div>
+            </div>
+          </div>
+          <div className="flex gap-4 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-bold transition-all uppercase tracking-widest text-[10px]">Huỷ</button>
+            <button type="submit" className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black shadow-xl shadow-indigo-600/30 transition-all uppercase tracking-widest text-[10px]">Cập nhật lớp học</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditStudentModal({ isOpen, studentData, onClose, onUpdate }: { isOpen: boolean, studentData: Student, onClose: () => void, onUpdate: (id: string, partial: Partial<Student>) => Promise<void> }) {
+  const [data, setData] = useState<Student>({...studentData});
+  if (!isOpen) return null;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onUpdate(data.id, { name: data.name, studentCode: data.studentCode, email: data.email });
+    onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700 rounded-[32px] w-full max-w-lg shadow-3xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+          <h2 className="text-xl font-black text-slate-100 italic">👤 Sửa thông tin Học viên</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Họ và Tên</label>
+              <input value={data.name} onChange={e => setData({...data, name: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Mã số học viên</label>
+              <input value={data.studentCode} onChange={e => setData({...data, studentCode: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Email</label>
+              <input value={data.email || ''} onChange={e => setData({...data, email: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="example@mail.com" />
+            </div>
+          </div>
+          <div className="flex gap-4 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-bold transition-all uppercase tracking-widest text-[10px]">Huỷ</button>
+            <button type="submit" className="flex-[2] py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black shadow-xl shadow-blue-600/30 transition-all uppercase tracking-widest text-[10px]">Lưu thay đổi</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditAssignmentModal({ isOpen, assignmentData, onClose, onUpdate }: { isOpen: boolean, assignmentData: Assignment, onClose: () => void, onUpdate: (id: string, partial: Partial<Assignment>) => Promise<void> }) {
+  const [data, setData] = useState<Assignment>({...assignmentData});
+  if (!isOpen) return null;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onUpdate(data.id, { title: data.title, dueDate: data.dueDate, points: data.points });
+    onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700 rounded-[32px] w-full max-w-lg shadow-3xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+          <h2 className="text-xl font-black text-slate-100 italic">📝 Sửa Bài Tập</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tiêu đề bài tập</label>
+              <input value={data.title} onChange={e => setData({...data, title: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all" required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+               <div>
+                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Hạn nộp</label>
+                 <input type="date" value={data.dueDate} onChange={e => setData({...data, dueDate: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all" required />
+               </div>
+               <div>
+                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Thang điểm (Max)</label>
+                 <input type="number" value={data.points || ''} onChange={e => setData({...data, points: Number(e.target.value)})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all" />
+               </div>
+            </div>
+          </div>
+          <div className="flex gap-4 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-bold transition-all uppercase tracking-widest text-[10px]">Huỷ</button>
+            <button type="submit" className="flex-[2] py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl font-black shadow-xl shadow-amber-600/30 transition-all uppercase tracking-widest text-[10px]">Cập nhật bài tập</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditDocModal({ isOpen, docData, onClose, onUpdate }: { isOpen: boolean, docData: TeachingDoc, onClose: () => void, onUpdate: (id: string, partial: Partial<TeachingDoc>) => Promise<void> }) {
+  const [data, setData] = useState<TeachingDoc>({...docData});
+  if (!isOpen) return null;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onUpdate(data.id, { title: data.title, url: data.url });
+    onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700 rounded-[32px] w-full max-w-lg shadow-3xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+          <h2 className="text-xl font-black text-slate-100 italic">📂 Sửa Tài Liệu</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Tên tài liệu</label>
+              <input value={data.title} onChange={e => setData({...data, title: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" required />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Đường dẫn (URL)</label>
+              <input value={data.url} onChange={e => setData({...data, url: e.target.value})} className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" required />
+            </div>
+          </div>
+          <div className="flex gap-4 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-bold transition-all uppercase tracking-widest text-[10px]">Huỷ</button>
+            <button type="submit" className="flex-[2] py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black shadow-xl shadow-emerald-600/30 transition-all uppercase tracking-widest text-[10px]">Lưu tài liệu</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

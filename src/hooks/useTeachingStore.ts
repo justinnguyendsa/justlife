@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import type { Class, Student, Task, Submission, TeachingDoc } from '../types';
+import type { Class, Student, Task, Submission, TeachingDoc, Assignment, Attendance } from '../types';
 
 export const useTeachingStore = () => {
   const classes = useLiveQuery(() => db.classes.toArray()) as Class[] | undefined ?? [];
@@ -63,6 +63,10 @@ export const useTeachingStore = () => {
     },
     []
   );
+  
+  const updateClass = useCallback(async (id: string, partial: Partial<Class>) => {
+    await db.classes.update(id, partial);
+  }, []);
 
   const deleteClass = useCallback(async (id: string) => {
     // Note: Do not delete Students and Docs! Instead, remove `classId` from their `classIds` array!
@@ -108,8 +112,25 @@ export const useTeachingStore = () => {
     await db.students.add(s);
   }, []);
 
+  const bulkAddStudents = useCallback(async (items: Array<{name: string, studentCode: string, email?: string}>, classId?: string) => {
+    const newStudents: Student[] = items.map(item => ({
+      id: crypto.randomUUID(),
+      classIds: classId ? [classId] : [],
+      name: item.name,
+      studentCode: item.studentCode,
+      email: item.email,
+      status: 'ACTIVE',
+      joinedAt: Date.now()
+    }));
+    await db.students.bulkAdd(newStudents);
+  }, []);
+
   const deleteStudent = useCallback(async (id: string) => {
     await db.students.delete(id);
+  }, []);
+
+  const updateStudent = useCallback(async (id: string, partial: Partial<Student>) => {
+    await db.students.update(id, partial);
   }, []);
 
   const assignStudentToClass = useCallback(async (studentId: string, classId: string) => {
@@ -190,6 +211,18 @@ export const useTeachingStore = () => {
     });
   }, []);
 
+  const deleteAssignment = useCallback(async (id: string) => {
+    await db.transaction('rw', [db.assignments, db.submissions], async () => {
+      await db.assignments.delete(id);
+      const subs = await db.submissions.where({ assignmentId: id }).primaryKeys();
+      if (subs.length > 0) await db.submissions.bulkDelete(subs);
+    });
+  }, []);
+
+  const updateAssignment = useCallback(async (id: string, partial: Partial<Assignment>) => {
+    await db.assignments.update(id, partial);
+  }, []);
+
   const updateSubmission = useCallback(async (id: string, partial: Partial<Submission>) => {
     await db.submissions.update(id, partial);
   }, []);
@@ -208,6 +241,10 @@ export const useTeachingStore = () => {
 
   const deleteDocument = useCallback(async (id: string) => {
     await db.teachingDocs.delete(id);
+  }, []);
+
+  const updateDocument = useCallback(async (id: string, partial: Partial<TeachingDoc>) => {
+    await db.teachingDocs.update(id, partial);
   }, []);
 
   const assignDocToClass = useCallback(async (docId: string, classId: string) => {
@@ -234,15 +271,21 @@ export const useTeachingStore = () => {
     submissions,
     teachingDocs,
     addClass,
+    updateClass,
     deleteClass,
     addStudent,
+    updateStudent,
+    bulkAddStudents,
     deleteStudent,
     assignStudentToClass,
     removeStudentFromClass,
     toggleAttendance,
     addAssignment,
+    updateAssignment,
+    deleteAssignment,
     updateSubmission,
     addDocument,
+    updateDocument,
     deleteDocument,
     assignDocToClass,
     removeDocFromClass
