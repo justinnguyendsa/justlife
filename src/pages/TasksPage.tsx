@@ -221,8 +221,7 @@ export default function TasksPage() {
     if (activeRole !== 'ALL') result = result.filter((t) => t.role === activeRole);
     return [...result].sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
-      const pMap = { HIGH: 3, MEDIUM: 2, LOW: 1 };
-      if (pMap[a.priority] !== pMap[b.priority]) return pMap[b.priority] - pMap[a.priority];
+
       if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
       return 0;
     });

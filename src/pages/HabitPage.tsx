@@ -278,7 +278,7 @@ export default function HabitPage() {
                       {habit.name}
                     </h3>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${color.light} ${color.text}`}>
-                      {CATEGORY_LABELS[habit.category]}
+
                     </span>
                   </div>
                   {habit.description && (

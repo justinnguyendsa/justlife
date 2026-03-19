@@ -1,15 +1,16 @@
 import Dexie, { type Table } from 'dexie';
-import type { Task, Habit, HabitLog, Class, Student, Attendance } from '../types';
+import type { Task, Habit, HabitLog, Class, Student, Attendance, Assignment, Submission, TeachingDoc } from '../types';
 
 export class JustLifeDB extends Dexie {
   tasks!: Table<Task, string>;
   habits!: Table<Habit, string>;
-  // We use a generated string ID for habitLogs to avoid composite primary key tricky issues: "habitId_date"
   habitLogs!: Table<HabitLog & { id: string }, string>;
   classes!: Table<Class, string>;
   students!: Table<Student, string>;
   attendances!: Table<Attendance, string>;
-
+  assignments!: Table<Assignment, string>;
+  submissions!: Table<Submission, string>;
+  teachingDocs!: Table<TeachingDoc, string>;
   constructor() {
     super('JustLifeDB');
     this.version(1).stores({
@@ -19,6 +20,27 @@ export class JustLifeDB extends Dexie {
       classes: 'id, courseCode, createdAt',
       students: 'id, classId, studentCode, status',
       attendances: 'id, classId, studentId, date'
+    });
+
+    // Version 2: Add assignments and submissions
+    this.version(2).stores({
+      assignments: 'id, classId, dueDate',
+      submissions: 'id, assignmentId, studentId, isMarked'
+    });
+
+    // Version 3: Add teaching docs
+    this.version(3).stores({
+      teachingDocs: 'id, classId, createdAt'
+    });
+
+    // Version 4: Refactor to Many-to-Many via classIds array
+    this.version(4).stores({
+      students: 'id, *classIds, studentCode, status',
+      teachingDocs: 'id, *classIds, createdAt'
+    }).upgrade(async (tx) => {
+       // Clear old data for students and teachingDocs since shape changed heavily
+       await tx.table('students').clear();
+       await tx.table('teachingDocs').clear();
     });
   }
 }
@@ -54,13 +76,12 @@ export async function migrateFromLocalStorage() {
       if (lsLogs.length > 0) {
         const enrichedLogs = lsLogs.map(l => ({
           ...l,
-          id: `${l.habitId}_${l.date}`
+          id: `${l.habitId}_l.date`
         }));
         await db.habitLogs.bulkPut(enrichedLogs);
       }
     }
 
-    // Mark as migrated
     localStorage.setItem('justlife_migrated_dexie', 'true');
     console.log('✅ Migration to IndexedDB completed successfully.');
   } catch (error) {

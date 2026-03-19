@@ -56,7 +56,7 @@ export interface Class {
 
 export interface Student {
   id: string; // uuid
-  classId: string; // link to Class
+  classIds: string[]; // Mảng Lớp học thay vì 1 class
   name: string;
   studentCode: string;
   email?: string;
@@ -72,4 +72,33 @@ export interface Attendance {
   date: string; // YYYY-MM-DD (ngày điểm danh)
   status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
   note?: string;
+}
+
+export interface Assignment {
+  id: string; // uuid
+  classId: string;
+  title: string;
+  description?: string;
+  dueDate: string; // YYYY-MM-DD
+  points?: number; // Điểm tối đa (10, 100...)
+  createdAt: number;
+}
+
+export interface Submission {
+  id: string; // uuid
+  assignmentId: string;
+  studentId: string;
+  submittedAt?: number; // TS (nếu học viên chưa nộp thì undefined)
+  attachmentUrl?: string;
+  score?: number;
+  feedback?: string;
+  isMarked: boolean;
+}
+export interface TeachingDoc {
+  id: string; // uuid
+  classIds: string[]; // Nhiều lớp
+  title: string;
+  url: string;
+  description?: string;
+  createdAt: number;
 }
