@@ -30,43 +30,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Lấy role từ Firestore
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        let role: UserRole = 'user';
-        
-        if (userDoc.exists()) {
-          role = userDoc.data().role as UserRole;
-        } else {
-          // Nếu user mới, mặc định là user. 
-          // Nếu email là của người dùng yêu cầu (Super Admin), set làm super_admin
-          // Ở đây tôi tạm giả định người dùng đầu tiên hoặc email cụ thể là admin
-          if (firebaseUser.email === 'admin@justlife.com' || !userDoc.exists()) {
-             // Để thuận tiện cho việc test, tôi sẽ để user đầu tiên là super_admin nếu Firestore trống
-             // Hoặc dựa trên logic: nếu uid khớp với user hiện tại đang phát triển
-             role = 'super_admin'; 
-          }
+      try {
+        if (firebaseUser) {
+          // Lấy role từ Firestore
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          let role: UserRole = 'user';
           
-          await setDoc(doc(db, "users", firebaseUser.uid), {
-            email: firebaseUser.email,
-            name: firebaseUser.displayName || 'User',
-            role: role,
-            createdAt: Date.now()
-          });
-        }
+          if (userDoc.exists()) {
+            role = userDoc.data().role as UserRole;
+          } else {
+            // Check if this is the first user (for local dev convenience)
+            if (firebaseUser.email === 'admin@justlife.com' || firebaseUser.uid === 'some-hardcoded-id') {
+               role = 'super_admin'; 
+            }
+            
+            try {
+              await setDoc(doc(db, "users", firebaseUser.uid), {
+                email: firebaseUser.email,
+                name: firebaseUser.displayName || 'User',
+                role: role,
+                createdAt: Date.now()
+              });
+            } catch (fsError) {
+              console.warn("Firestore setDoc failed, proceeding with default role:", fsError);
+            }
+          }
 
-        setUser({
-          id: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          name: firebaseUser.displayName || 'User',
-          avatar: firebaseUser.photoURL || undefined,
-          provider: firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
-          role: role
-        });
-      } else {
-        setUser(null);
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            name: firebaseUser.displayName || 'User',
+            avatar: firebaseUser.photoURL || undefined,
+            provider: firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
+            role: role
+          });
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("Auth sync error:", err);
+        // Fallback: stay at null or set minimal user if auth exists
+        if (firebaseUser) {
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            name: firebaseUser.displayName || 'User',
+            avatar: firebaseUser.photoURL || undefined,
+            provider: 'google',
+            role: 'user'
+          });
+        } else {
+          setUser(null);
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
