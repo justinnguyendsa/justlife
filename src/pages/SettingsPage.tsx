@@ -3,13 +3,13 @@ import { useSettingsStore } from '../hooks/useSettingsStore';
 import { useAuth } from '../context/AuthContext';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { User, UserRole } from '../types';
+import type { UserRole } from '../types';
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettingsStore();
   const { user: currentUser, updateUserRole } = useAuth();
   const [notiPermission, setNotiPermission] = useState<NotificationPermission>('default');
-  
+
   // User Management State
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -56,7 +56,7 @@ export default function SettingsPage() {
         perm = await Notification.requestPermission();
         setNotiPermission(perm);
       }
-      
+
       if (perm === 'granted') {
         updateSettings({ enableNotifications: true });
         new Notification('JustLife', { body: 'Thông báo đã được bật thành công!' });
@@ -92,7 +92,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <button onClick={fetchUsers} className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
-                 <svg className={`w-5 h-5 ${loadingUsers ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                <svg className={`w-5 h-5 ${loadingUsers ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               </button>
             </div>
 
@@ -111,33 +111,32 @@ export default function SettingsPage() {
                     <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
-                           <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-indigo-400 border border-slate-700">
-                              {u.name.charAt(0).toUpperCase()}
-                           </div>
-                           <span className="font-medium text-slate-200">{u.name}</span>
+                          <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-indigo-400 border border-slate-700">
+                            {u.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-medium text-slate-200">{u.name}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-slate-400 font-mono text-xs">{u.email}</td>
                       <td className="px-4 py-4 text-center">
-                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${
-                           u.role === 'super_admin' ? 'bg-indigo-500/20 text-indigo-400' :
-                           u.role === 'admin' ? 'bg-blue-500/20 text-blue-400' :
-                           'bg-slate-800 text-slate-500'
-                         }`}>
-                           {u.role}
-                         </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${u.role === 'super_admin' ? 'bg-indigo-500/20 text-indigo-400' :
+                            u.role === 'admin' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-slate-800 text-slate-500'
+                          }`}>
+                          {u.role}
+                        </span>
                       </td>
                       <td className="px-4 py-4 text-right">
-                         <select 
-                           value={u.role} 
-                           onChange={(e) => updateUserRole(u.id, e.target.value as UserRole)}
-                           className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
-                           disabled={u.id === currentUser.id} // Không tự đổi quyền mình
-                         >
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
-                            <option value="super_admin">Super Admin</option>
-                         </select>
+                        <select
+                          value={u.role}
+                          onChange={(e) => updateUserRole(u.id, e.target.value as UserRole)}
+                          className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-indigo-500"
+                          disabled={u.id === currentUser.id} // Không tự đổi quyền mình
+                        >
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
+                          <option value="super_admin">Super Admin</option>
+                        </select>
                       </td>
                     </tr>
                   ))}
@@ -172,9 +171,8 @@ export default function SettingsPage() {
             <button
               onClick={handleToggleNotifications}
               disabled={notiPermission === 'denied'}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                settings.enableNotifications ? 'bg-indigo-500' : 'bg-slate-600'
-              } disabled:opacity-50`}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${settings.enableNotifications ? 'bg-indigo-500' : 'bg-slate-600'
+                } disabled:opacity-50`}
             >
               <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${settings.enableNotifications ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -210,32 +208,32 @@ export default function SettingsPage() {
 
         {/* Section: Firebase / Data Status */}
         <section className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-6 shadow-xl">
-           <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-                </svg>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-200">Hệ thống Dữ liệu</h2>
+              <p className="text-sm text-slate-400 mt-0.5">Xác thực real-time qua Firebase Auth.</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                <span className="text-sm text-slate-200">Firebase SDK: <span className="text-emerald-400 font-mono">Active</span></span>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-200">Hệ thống Dữ liệu</h2>
-                <p className="text-sm text-slate-400 mt-0.5">Xác thực real-time qua Firebase Auth.</p>
-              </div>
-           </div>
-           
-           <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/50">
-              <div className="flex items-center justify-between">
-                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                    <span className="text-sm text-slate-200">Firebase SDK: <span className="text-emerald-400 font-mono">Active</span></span>
-                 </div>
-                 <button 
-                   onClick={() => alert('Vui lòng kiểm tra src/lib/firebase.ts để cấu hình API Key thật.')}
-                   className="text-xs text-indigo-400 hover:underline"
-                 >
-                   Kiểm tra kết nối
-                 </button>
-              </div>
-           </div>
+              <button
+                onClick={() => alert('Vui lòng kiểm tra src/lib/firebase.ts để cấu hình API Key thật.')}
+                className="text-xs text-indigo-400 hover:underline"
+              >
+                Kiểm tra kết nối
+              </button>
+            </div>
+          </div>
         </section>
       </div>
     </div>
