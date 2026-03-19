@@ -93,7 +93,7 @@ export default function AdminPage() {
                               </div>
                               <div>
                                 <p className="font-medium text-slate-200">{u.name}</p>
-                                <p className="text-[10px] text-slate-500">{u.email}</p>
+                                <p className="text-[10px] text-slate-500">{u.username || u.email}</p>
                               </div>
                             </div>
                           </td>

@@ -96,8 +96,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, pass: string) => {
-    const res = await signInWithEmailAndPassword(auth, email, pass);
+  const login = async (identifier: string, pass: string) => {
+    const finalEmail = identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s/g, '')}@justlife.internal`;
+    const res = await signInWithEmailAndPassword(auth, finalEmail, pass);
     import('../db').then(({ db: localDb }) => {
       localDb.loginLogs.add({
         id: crypto.randomUUID(),
@@ -108,13 +109,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const register = async (email: string, pass: string, name: string) => {
-    const res = await createUserWithEmailAndPassword(auth, email, pass);
+  const register = async (identifier: string, pass: string, name: string) => {
+    const isEmail = identifier.includes('@');
+    const finalEmail = isEmail ? identifier : `${identifier.toLowerCase().replace(/\s/g, '')}@justlife.internal`;
+    const username = isEmail ? identifier.split('@')[0] : identifier;
+
+    const res = await createUserWithEmailAndPassword(auth, finalEmail, pass);
     await updateProfile(res.user, { displayName: name });
 
     // Khởi tạo user trong Firestore
     await setDoc(doc(db, "users", res.user.uid), {
-      email,
+      email: isEmail ? finalEmail : '',
+      username: username,
       name,
       role: 'user',
       createdAt: Date.now()
