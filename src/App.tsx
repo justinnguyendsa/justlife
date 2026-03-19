@@ -10,6 +10,7 @@ import TeachingPage from './pages/TeachingPage';
 import { StudyingPage } from './pages/StudyingPage';
 import { WorkingPage } from './pages/WorkingPage';
 import SettingsPage from './pages/SettingsPage';
+import AdminPage from './pages/AdminPage';
 import { AuthPage } from './pages/AuthPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useNotificationEngine } from './hooks/useNotificationEngine';
@@ -62,6 +63,7 @@ const AppContent = () => {
           <Route path="working" element={<Navigate to="/working/projects" replace />} />
           <Route path="working/:tab" element={<WorkingPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="admin" element={<AdminPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

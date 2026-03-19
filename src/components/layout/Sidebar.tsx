@@ -92,6 +92,15 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    to: '/admin',
+    label: 'Admin Panel',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-indigo-400">
+        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar() {
@@ -139,7 +148,10 @@ export default function Sidebar() {
 
       {/* Nav Items */}
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter(item => {
+          if (item.label === 'Admin Panel' && user?.role !== 'super_admin') return false;
+          return true;
+        }).map((item) => {
           if (item.subItems) {
             const isExpanded = expanded[item.label] || false;
             // Highlight parent if any child is active

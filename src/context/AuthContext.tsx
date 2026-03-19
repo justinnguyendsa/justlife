@@ -55,13 +55,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
 
-          setUser({
+          const userProfile: User = {
             id: firebaseUser.uid,
             email: firebaseUser.email || '',
             name: firebaseUser.displayName || 'User',
             avatar: firebaseUser.photoURL || undefined,
             provider: firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
             role: role
+          };
+
+          setUser(userProfile);
+          
+          // Luôn đồng bộ vào Local DB để truy xuất nhanh và offline
+          import('../db').then(({ db: localDb }) => {
+            localDb.users.put({ ...userProfile });
           });
         } else {
           setUser(null);
@@ -90,7 +97,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, pass: string) => {
-    await signInWithEmailAndPassword(auth, email, pass);
+    const res = await signInWithEmailAndPassword(auth, email, pass);
+    import('../db').then(({ db: localDb }) => {
+      localDb.loginLogs.add({
+        id: crypto.randomUUID(),
+        userId: res.user.uid,
+        timestamp: Date.now(),
+        type: 'login'
+      });
+    });
   };
 
   const register = async (email: string, pass: string, name: string) => {
@@ -112,7 +127,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    const uid = user?.id;
     signOut(auth);
+    if (uid) {
+      import('../db').then(({ db: localDb }) => {
+        localDb.loginLogs.add({
+          id: crypto.randomUUID(),
+          userId: uid,
+          timestamp: Date.now(),
+          type: 'logout'
+        });
+      });
+    }
   };
 
   const updateUserRole = async (uid: string, newRole: UserRole) => {

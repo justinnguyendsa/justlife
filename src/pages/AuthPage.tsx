@@ -23,11 +23,13 @@ export function AuthPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    const finalEmail = email.includes('@') ? email : `${email.toLowerCase().replace(/\s/g, '') || 'user_' + Math.floor(Math.random()*1000)}@justlife.internal`;
+    
     try {
       if (isLogin) {
-        await login(email, password);
+        await login(finalEmail, password);
       } else {
-        await register(email, password, name);
+        await register(finalEmail, password, name || email || 'User');
       }
     } catch (err: any) {
       console.error(err);
@@ -111,10 +113,10 @@ export function AuthPage() {
                 </div>
               )}
               <div className="space-y-1.5">
-                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Email</label>
+                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Tài khoản / Email (Tùy chọn)</label>
                  <input 
-                   type="email" required value={email} onChange={e=>setEmail(e.target.value)}
-                   placeholder="name@example.com"
+                   type="text" value={email} onChange={e=>setEmail(e.target.value)}
+                   placeholder="VD: admin hoặc name@example.com"
                    disabled={loading}
                    className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium disabled:opacity-50" 
                  />
