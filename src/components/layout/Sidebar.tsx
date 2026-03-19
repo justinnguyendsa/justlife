@@ -53,13 +53,17 @@ const NAV_ITEMS: NavItem[] = [
     ]
   },
   {
-    to: '/studying',
     label: 'Studying',
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
         <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
       </svg>
     ),
+    subItems: [
+      { to: '/studying/courses', label: 'Khóa học' },
+      { to: '/studying/assignments', label: 'Bài tập & Deadline' },
+      { to: '/studying/documents', label: 'Tài liệu học tập' }
+    ]
   },
   {
     label: 'Extensions',
@@ -93,7 +97,8 @@ export default function Sidebar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     'Tasks': location.pathname.includes('/task') || location.pathname.includes('/calendar'),
     'Extensions': ['/analytics', '/focus', '/habits'].includes(location.pathname),
-    'Teaching': location.pathname.includes('/teaching')
+    'Teaching': location.pathname.includes('/teaching'),
+    'Studying': location.pathname.includes('/studying')
   });
 
   const toggleExpand = (label: string) => {

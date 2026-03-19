@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Task, Habit, HabitLog, Class, Student, Attendance, Assignment, Submission, TeachingDoc } from '../types';
+import type { Task, Habit, HabitLog, Class, Student, Attendance, Assignment, Submission, TeachingDoc, StudyCourse, StudyAssignment, StudyDoc } from '../types';
 
 export class JustLifeDB extends Dexie {
   tasks!: Table<Task, string>;
@@ -11,6 +11,9 @@ export class JustLifeDB extends Dexie {
   assignments!: Table<Assignment, string>;
   submissions!: Table<Submission, string>;
   teachingDocs!: Table<TeachingDoc, string>;
+  studyCourses!: Table<StudyCourse, string>;
+  studyAssignments!: Table<StudyAssignment, string>;
+  studyDocs!: Table<StudyDoc, string>;
   constructor() {
     super('JustLifeDB');
     this.version(1).stores({
@@ -38,9 +41,15 @@ export class JustLifeDB extends Dexie {
       students: 'id, *classIds, studentCode, status',
       teachingDocs: 'id, *classIds, createdAt'
     }).upgrade(async (tx) => {
-       // Clear old data for students and teachingDocs since shape changed heavily
        await tx.table('students').clear();
        await tx.table('teachingDocs').clear();
+    });
+
+    // Version 5: Add studying hub tables
+    this.version(5).stores({
+      studyCourses: 'id, courseCode, createdAt',
+      studyAssignments: 'id, courseId, dueDate, status',
+      studyDocs: 'id, courseId, createdAt'
     });
   }
 }

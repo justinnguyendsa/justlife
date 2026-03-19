@@ -102,3 +102,40 @@ export interface TeachingDoc {
   description?: string;
   createdAt: number;
 }
+// ─── STUDYING HUB MODELS ─────────────────────────────────────────────────────────
+export interface StudyCourse {
+  id: string; // uuid
+  name: string;
+  courseCode: string; // e.g. "SOFT501"
+  description?: string;
+  lmsUrl?: string; // Link to university LMS
+  scheduleRules: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  createdAt: number;
+}
+
+export interface StudyAssignment {
+  id: string; // uuid
+  courseId: string;
+  title: string;
+  description?: string;
+  dueDate: string; // ISO date-time string
+  priority: Priority;
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
+  weight?: number; // % of total grade
+  points?: number; // Grade received
+  createdAt: number;
+}
+
+export type StudyDocType = 'SLIDE' | 'BOOK' | 'REFERENCE' | 'MY_NOTES';
+
+export interface StudyDoc {
+  id: string; // uuid
+  courseId: string;
+  title: string;
+  url: string;
+  type: StudyDocType;
+  description?: string;
+  createdAt: number;
+}
