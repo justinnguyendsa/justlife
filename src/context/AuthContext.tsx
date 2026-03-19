@@ -9,7 +9,7 @@ import {
   updateProfile
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query as fsQuery, where, getDocs } from "firebase/firestore";
 import type { User, UserRole } from '../types';
 
 interface AuthContextType {
@@ -112,15 +112,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (identifier: string, pass: string, name: string) => {
     const isEmail = identifier.includes('@');
-    // Nếu identifier trống, sinh ID dựa trên name hoặc random
-    const baseId = identifier || `${name.toLowerCase().replace(/\s/g, '') || 'user'}_${Math.floor(1000 + Math.random() * 9000)}`;
-    const finalEmail = isEmail ? identifier : `${baseId.toLowerCase().replace(/\s/g, '')}@justlife.id`;
-    const username = isEmail ? identifier.split('@')[0] : baseId;
+    const username = isEmail ? identifier.split('@')[0] : identifier.toLowerCase().replace(/\s/g, '');
+    const finalEmail = isEmail ? identifier : `${username}@justlife.id`;
 
+    // 1. Kiểm tra username tồn tại chưa
+    const q = fsQuery(collection(db, "users"), where("username", "==", username));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const error = new Error('Tên đăng nhập đã tồn tại.');
+      (error as any).code = 'auth/username-already-in-use';
+      throw error;
+    }
+
+    // 2. Tạo user trong Firebase Auth
     const res = await createUserWithEmailAndPassword(auth, finalEmail, pass);
     await updateProfile(res.user, { displayName: name });
 
-    // Khởi tạo user trong Firestore
+    // 3. Khởi tạo user trong Firestore
     await setDoc(doc(db, "users", res.user.uid), {
       email: isEmail ? finalEmail : null,
       username: username,

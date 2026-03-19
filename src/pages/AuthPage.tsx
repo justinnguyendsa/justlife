@@ -25,16 +25,9 @@ export function AuthPage() {
     setLoading(true);
     try {
       if (isLogin) {
-        // Nếu đăng nhập, email là bắt buộc (hoặc username)
-        if (!email) {
-          setError('Vui lòng nhập Tên tài khoản hoặc Email để đăng nhập.');
-          setLoading(false);
-          return;
-        }
         await login(email, password);
       } else {
-        // Đăng ký: email có thể rỗng
-        await register(email, password, name || 'User');
+        await register(email, password, name);
       }
     } catch (err: any) {
       console.error(err);
@@ -118,10 +111,10 @@ export function AuthPage() {
                 </div>
               )}
               <div className="space-y-1.5">
-                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Tài khoản (ID / Email) - Tùy chọn</label>
+                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Tên đăng nhập (ID / Email)</label>
                  <input 
-                   type="text" value={email} onChange={e=>setEmail(e.target.value)}
-                   placeholder="Bỏ trống để tự sinh ID"
+                   type="text" required value={email} onChange={e=>setEmail(e.target.value)}
+                   placeholder="VD: admin hoặc minhnn"
                    disabled={loading}
                    className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium disabled:opacity-50" 
                  />
