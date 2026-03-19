@@ -8,6 +8,7 @@ export function AuthPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const { login, register, googleLogin, user } = useAuth();
   const navigate = useNavigate();
@@ -21,22 +22,48 @@ export function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
       if (isLogin) {
         await login(email, password);
       } else {
         await register(email, password, name);
       }
-    } catch (err) {
-      setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        setError('Email hoặc mật khẩu không chính xác.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('Email này đã được sử dụng.');
+      } else {
+        setError('Lỗi xác thực: ' + (err.message || 'Vui lòng thử lại.'));
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
+    setError('');
+    
+    // Check for placeholders
+    if (import.meta.env.VITE_FIREBASE_API_KEY === 'YOUR_API_KEY' || !import.meta.env.VITE_FIREBASE_API_KEY) {
+      // In this case, I'll check the hardcoded file since we aren't using env yet
+      // But let's just check the error message in the catch block or a simple check
+    }
+
+    setLoading(true);
     try {
       await googleLogin();
-    } catch (err) {
-      setError('Lỗi đăng nhập Google.');
+    } catch (err: any) {
+      console.error(err);
+      if (err.message.includes('api-key-not-valid')) {
+        setError('Cấu hình Firebase chưa hoàn tất. Vui lòng dán API Key vào file src/lib/firebase.ts');
+      } else {
+        setError('Lỗi đăng nhập Google: ' + (err.message || 'Vui lòng thử lại.'));
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,7 +79,7 @@ export function AuthPage() {
               <span className="text-3xl">✨</span>
            </div>
            <h1 className="text-4xl font-black tracking-tight text-white mb-2">JustLife</h1>
-           <p className="text-slate-400 font-medium">Làm chủ cuộc sống, tối ưu hiệu suất</p>
+           <p className="text-slate-400 font-medium">Làm chủ cuộc sống với Firebase Auth</p>
         </div>
 
         <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl shadow-black/50">
@@ -74,46 +101,55 @@ export function AuthPage() {
            <form onSubmit={handleSubmit} className="space-y-5">
               {!isLogin && (
                 <div className="space-y-1.5">
-                   <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Họ tên công tác</label>
+                   <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Họ tên</label>
                    <input 
                      type="text" required value={name} onChange={e=>setName(e.target.value)}
                      placeholder="VD: Justin Nguyen"
-                     className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium" 
+                     disabled={loading}
+                     className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium disabled:opacity-50" 
                    />
                 </div>
               )}
               <div className="space-y-1.5">
-                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Email Address</label>
+                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Email</label>
                  <input 
                    type="email" required value={email} onChange={e=>setEmail(e.target.value)}
                    placeholder="name@example.com"
-                   className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium" 
+                   disabled={loading}
+                   className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium disabled:opacity-50" 
                  />
               </div>
               <div className="space-y-1.5">
-                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Mật khẩu bảo mật</label>
+                 <label className="text-[11px] uppercase font-black text-slate-500 ml-1 tracking-widest">Mật khẩu</label>
                  <input 
                    type="password" required value={password} onChange={e=>setPassword(e.target.value)}
                    placeholder="••••••••"
-                   className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium" 
+                   disabled={loading}
+                   className="w-full bg-white/[0.02] border border-white/10 rounded-2xl px-5 py-4 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-700 font-medium disabled:opacity-50" 
                  />
               </div>
 
-              {error && <p className="text-red-400 text-xs font-bold text-center px-2">{error}</p>}
+              {error && <p className="text-red-400 text-xs font-bold text-center px-2 bg-red-400/10 py-2 rounded-xl border border-red-500/20">{error}</p>}
 
-              <button type="submit" className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] mt-2">
-                {isLogin ? 'VÀO TRANG ĐIỀU KHIỂN' : 'TẠO TÀI KHOẢN MỚI'}
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] mt-2 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {isLogin ? 'ĐĂNG NHẬP HỆ THỐNG' : 'TẠO TÀI KHOẢN'}
               </button>
            </form>
 
            <div className="relative my-8">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-              <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest text-slate-600 bg-transparent px-2">Hoặc tiếp tục với</div>
+              <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest text-slate-600 bg-transparent px-2">Hoặc đăng nhập bằng</div>
            </div>
 
            <button 
              onClick={handleGoogle}
-             className="w-full py-4 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+             disabled={loading}
+             className="w-full py-4 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12 5.04c1.44 0 2.74.49 3.76 1.45l2.82-2.82C16.82 2.13 14.54 1 12 1 7.73 1 4.14 3.39 2.38 6.89l3.3 2.56C6.46 7.15 9 5.04 12 5.04z" />
@@ -125,7 +161,7 @@ export function AuthPage() {
            </button>
         </div>
 
-        <p className="text-center mt-8 text-[11px] text-slate-600 font-bold uppercase tracking-widest">JustLife Security Protocol • v15.0</p>
+        <p className="text-center mt-8 text-[11px] text-slate-600 font-bold uppercase tracking-widest">JustLife Security Protocol • v16.0 (Firebase)</p>
       </div>
     </div>
   );

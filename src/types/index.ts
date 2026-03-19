@@ -1,5 +1,15 @@
 export type Role = 'WORK' | 'TEACH' | 'MASTER';
+export type UserRole = 'super_admin' | 'admin' | 'user';
 export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  provider: 'local' | 'google' | 'password';
+  role: UserRole;
+}
 
 export interface Task {
   id: string;

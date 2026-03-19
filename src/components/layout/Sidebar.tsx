@@ -240,7 +240,7 @@ export default function Sidebar() {
 
         <div className="p-3 rounded-xl bg-slate-800/20 border border-slate-700/30">
           <p className="text-[10px] text-slate-600 text-center italic">
-            JustLife Security Protocol v15
+            JustLife Security Protocol v16 (Firebase)
           </p>
         </div>
       </div>

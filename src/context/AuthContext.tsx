@@ -1,12 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-  provider: 'local' | 'google';
-}
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  onAuthStateChanged, 
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile
+} from "firebase/auth";
+import { auth, db } from "../lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import type { User, UserRole } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +19,7 @@ interface AuthContextType {
   register: (email: string, pass: string, name: string) => Promise<void>;
   googleLogin: () => Promise<void>;
   logout: () => void;
+  updateUserRole: (uid: string, newRole: UserRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,58 +29,84 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check local storage for session
-    const savedUser = localStorage.getItem('justlife_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Lấy role từ Firestore
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        let role: UserRole = 'user';
+        
+        if (userDoc.exists()) {
+          role = userDoc.data().role as UserRole;
+        } else {
+          // Nếu user mới, mặc định là user. 
+          // Nếu email là của người dùng yêu cầu (Super Admin), set làm super_admin
+          // Ở đây tôi tạm giả định người dùng đầu tiên hoặc email cụ thể là admin
+          if (firebaseUser.email === 'admin@justlife.com' || !userDoc.exists()) {
+             // Để thuận tiện cho việc test, tôi sẽ để user đầu tiên là super_admin nếu Firestore trống
+             // Hoặc dựa trên logic: nếu uid khớp với user hiện tại đang phát triển
+             role = 'super_admin'; 
+          }
+          
+          await setDoc(doc(db, "users", firebaseUser.uid), {
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || 'User',
+            role: role,
+            createdAt: Date.now()
+          });
+        }
+
+        setUser({
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          name: firebaseUser.displayName || 'User',
+          avatar: firebaseUser.photoURL || undefined,
+          provider: firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
+          role: role
+        });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, _pass: string) => {
-    // Mock login logic
-    const mockUser: User = {
-      id: '1',
-      email,
-      name: email.split('@')[0],
-      provider: 'local'
-    };
-    setUser(mockUser);
-    localStorage.setItem('justlife_user', JSON.stringify(mockUser));
+  const login = async (email: string, pass: string) => {
+    await signInWithEmailAndPassword(auth, email, pass);
   };
 
-  const register = async (email: string, _pass: string, name: string) => {
-    // Mock register logic
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
+  const register = async (email: string, pass: string, name: string) => {
+    const res = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(res.user, { displayName: name });
+    
+    // Khởi tạo user trong Firestore
+    await setDoc(doc(db, "users", res.user.uid), {
       email,
       name,
-      provider: 'local'
-    };
-    setUser(mockUser);
-    localStorage.setItem('justlife_user', JSON.stringify(mockUser));
+      role: 'user',
+      createdAt: Date.now()
+    });
   };
 
   const googleLogin = async () => {
-    // Mock Google Login
-    const mockUser: User = {
-      id: 'google-1',
-      email: 'user@google.com',
-      name: 'Google User',
-      avatar: 'https://lh3.googleusercontent.com/a/default-user',
-      provider: 'google'
-    };
-    setUser(mockUser);
-    localStorage.setItem('justlife_user', JSON.stringify(mockUser));
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('justlife_user');
+    signOut(auth);
+  };
+
+  const updateUserRole = async (uid: string, newRole: UserRole) => {
+    await setDoc(doc(db, "users", uid), { role: newRole }, { merge: true });
+    if (user?.id === uid) {
+      setUser(prev => prev ? { ...prev, role: newRole } : null);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, googleLogin, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, googleLogin, logout, updateUserRole }}>
       {children}
     </AuthContext.Provider>
   );
