@@ -2,18 +2,18 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTeachingStore } from '../hooks/useTeachingStore';
 import DateInput from '../components/ui/DateInput';
-import Badge from '../components/ui/Badge';
+// import Badge from '../components/ui/Badge';
 import type { Class, Student, Assignment, Submission, TeachingDoc, Attendance } from '../types';
 
 // Utility to generate session dates
 function generateSessions(startStr: string, endStr: string, daysOfWeek: number[]) {
   const sessions: string[] = [];
   if (!startStr || !endStr || daysOfWeek.length === 0) return sessions;
-  
+
   const start = new Date(startStr);
   const end = new Date(endStr);
   const current = new Date(start);
-  
+
   current.setHours(12, 0, 0, 0);
   end.setHours(12, 0, 0, 0);
 
@@ -31,13 +31,13 @@ export default function TeachingPage() {
   const store = useTeachingStore();
   const mainTab = (tab?.toUpperCase() || 'CLASSES') as 'CLASSES' | 'STUDENTS' | 'DOCUMENTS';
 
-  const { 
-    classes, students, assignments, submissions, attendances, teachingDocs, 
-    addClass, deleteClass, addStudent, deleteStudent, addAssignment, 
+  const {
+    classes, students, assignments, submissions, attendances, teachingDocs,
+    addClass, deleteClass, addStudent, deleteStudent, addAssignment,
     updateSubmission, toggleAttendance, addDocument, deleteDocument,
     assignStudentToClass, removeStudentFromClass, assignDocToClass, removeDocFromClass
   } = store;
-  
+
   const [showModal, setShowModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [activeTab, setActiveTab] = useState<'STUDENTS' | 'ASSIGNMENTS' | 'ATTENDANCE' | 'DOCUMENTS'>('STUDENTS');
@@ -196,15 +196,15 @@ export default function TeachingPage() {
                       {cls.scheduleRules.map((d: number) => DAYS[d]).join(', ')}
                     </td>
                     <td className="px-5 py-4 hidden sm:table-cell text-center">
-                       <span className="px-2 py-1 bg-slate-800 rounded font-bold text-slate-300">{stuCount} SV</span>
+                      <span className="px-2 py-1 bg-slate-800 rounded font-bold text-slate-300">{stuCount} SV</span>
                     </td>
                     <td className="px-5 py-4 text-right">
-                       <div className="flex justify-end gap-2 pr-2">
-                         <button onClick={(e) => { e.stopPropagation(); setSelectedClass(cls); setActiveTab('ATTENDANCE'); }} className="p-2 text-slate-500 hover:text-amber-400 bg-slate-800/50 rounded-lg">📋</button>
-                         <button onClick={(e) => { e.stopPropagation(); if(window.confirm('Xoá lớp học này?')) deleteClass(cls.id) }} className="p-2 text-slate-500 hover:text-red-400 bg-slate-800/50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                         </button>
-                       </div>
+                      <div className="flex justify-end gap-2 pr-2">
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedClass(cls); setActiveTab('ATTENDANCE'); }} className="p-2 text-slate-500 hover:text-amber-400 bg-slate-800/50 rounded-lg">📋</button>
+                        <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Xoá lớp học này?')) deleteClass(cls.id) }} className="p-2 text-slate-500 hover:text-red-400 bg-slate-800/50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -219,56 +219,56 @@ export default function TeachingPage() {
       {mainTab === 'STUDENTS' && (
         <div className="gap-6 grid grid-cols-1 lg:grid-cols-4">
           <div className="lg:col-span-1 border border-indigo-500/20 bg-slate-900/50 backdrop-blur-xl rounded-2xl p-6 h-fit shadow-xl">
-             <h3 className="text-lg font-bold text-indigo-400 mb-5 flex items-center gap-2"><span>👤</span> Tạo Học Viên</h3>
-             <form onSubmit={handleAddNewStudentToPool} className="space-y-4">
-                <div>
-                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Họ và Tên</label>
-                   <input type="text" required placeholder="VD: Nguyễn Văn A" value={studentName} onChange={e=>setStudentName(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                </div>
-                <div>
-                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Mã số học viên</label>
-                   <input type="text" required placeholder="VD: 20210001" value={studentCode} onChange={e=>setStudentCode(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                </div>
-                <button type="submit" disabled={!studentName || !studentCode} className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50">Lưu vào Hệ Thống</button>
-             </form>
+            <h3 className="text-lg font-bold text-indigo-400 mb-5 flex items-center gap-2"><span>👤</span> Tạo Học Viên</h3>
+            <form onSubmit={handleAddNewStudentToPool} className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Họ và Tên</label>
+                <input type="text" required placeholder="VD: Nguyễn Văn A" value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Mã số học viên</label>
+                <input type="text" required placeholder="VD: 20210001" value={studentCode} onChange={e => setStudentCode(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+              </div>
+              <button type="submit" disabled={!studentName || !studentCode} className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50">Lưu vào Hệ Thống</button>
+            </form>
           </div>
           <div className="lg:col-span-3">
-             <div className="overflow-x-auto rounded-2xl border border-slate-800/70 bg-slate-900/40 backdrop-blur-md">
-               <table className="w-full text-left text-sm">
-                 <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
-                   <tr>
-                     <th className="px-5 py-4 font-semibold">Họ tên & Mã SV</th>
-                     <th className="px-5 py-4 font-semibold">Lớp đang theo học</th>
-                     <th className="px-5 py-4 font-semibold text-right">Thao tác</th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-slate-800/50">
-                   {students.map(s => (
-                     <tr key={s.id} className="group hover:bg-slate-800/40 transition-colors">
-                       <td className="px-5 py-4">
-                          <p className="text-slate-200 font-bold">{s.name}</p>
-                          <p className="text-slate-500 font-mono text-xs mt-0.5">{s.studentCode}</p>
-                       </td>
-                       <td className="px-5 py-4">
-                         <div className="flex flex-wrap gap-1.5">
-                           {s.classIds.map(cid => {
-                             const cls = classes.find(c => c.id === cid);
-                             return cls ? <span key={cid} className="px-2 py-0.5 bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-bold rounded font-mono uppercase">{cls.courseCode}</span> : null;
-                           })}
-                           {s.classIds.length === 0 && <span className="text-slate-600 italic text-xs">Chưa xếp lớp</span>}
-                         </div>
-                       </td>
-                       <td className="px-5 py-4 text-right">
-                          <button onClick={() => { if(window.confirm('Xóa sinh viên này?')) deleteStudent(s.id) }} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                       </td>
-                     </tr>
-                   ))}
-                   {students.length === 0 && <tr><td colSpan={3} className="text-center py-20 text-slate-500 italic">Kho học viên trống.</td></tr>}
-                 </tbody>
-               </table>
-             </div>
+            <div className="overflow-x-auto rounded-2xl border border-slate-800/70 bg-slate-900/40 backdrop-blur-md">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="px-5 py-4 font-semibold">Họ tên & Mã SV</th>
+                    <th className="px-5 py-4 font-semibold">Lớp đang theo học</th>
+                    <th className="px-5 py-4 font-semibold text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {students.map(s => (
+                    <tr key={s.id} className="group hover:bg-slate-800/40 transition-colors">
+                      <td className="px-5 py-4">
+                        <p className="text-slate-200 font-bold">{s.name}</p>
+                        <p className="text-slate-500 font-mono text-xs mt-0.5">{s.studentCode}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {s.classIds.map(cid => {
+                            const cls = classes.find(c => c.id === cid);
+                            return cls ? <span key={cid} className="px-2 py-0.5 bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-bold rounded font-mono uppercase">{cls.courseCode}</span> : null;
+                          })}
+                          {s.classIds.length === 0 && <span className="text-slate-600 italic text-xs">Chưa xếp lớp</span>}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button onClick={() => { if (window.confirm('Xóa sinh viên này?')) deleteStudent(s.id) }} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {students.length === 0 && <tr><td colSpan={3} className="text-center py-20 text-slate-500 italic">Kho học viên trống.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -277,63 +277,63 @@ export default function TeachingPage() {
       {mainTab === 'DOCUMENTS' && (
         <div className="gap-6 grid grid-cols-1 lg:grid-cols-4">
           <div className="lg:col-span-1 border border-emerald-500/20 bg-slate-900/50 backdrop-blur-xl rounded-2xl p-6 h-fit shadow-xl">
-             <h3 className="text-lg font-bold text-emerald-400 mb-5 flex items-center gap-2"><span>📂</span> Tạo Tài Liệu</h3>
-             <form onSubmit={handleAddNewDocToPool} className="space-y-4">
-                <div>
-                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Tên tài liệu</label>
-                   <input type="text" required placeholder="VD: Đề cương chi tiết" value={docTitle} onChange={e=>setDocTitle(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
-                </div>
-                <div>
-                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Đường dẫn URL</label>
-                   <input type="url" required placeholder="https://..." value={docUrl} onChange={e=>setDocUrl(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
-                </div>
-                <div>
-                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Mô tả ngắn</label>
-                   <input type="text" placeholder="Phân phối chương trình..." value={docDesc} onChange={e=>setDocDesc(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
-                </div>
-                <button type="submit" disabled={!docTitle || !docUrl} className="w-full py-3 mt-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50">Lưu vào Kho Gốc</button>
-             </form>
+            <h3 className="text-lg font-bold text-emerald-400 mb-5 flex items-center gap-2"><span>📂</span> Tạo Tài Liệu</h3>
+            <form onSubmit={handleAddNewDocToPool} className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Tên tài liệu</label>
+                <input type="text" required placeholder="VD: Đề cương chi tiết" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Đường dẫn URL</label>
+                <input type="url" required placeholder="https://..." value={docUrl} onChange={e => setDocUrl(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Mô tả ngắn</label>
+                <input type="text" placeholder="Phân phối chương trình..." value={docDesc} onChange={e => setDocDesc(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+              </div>
+              <button type="submit" disabled={!docTitle || !docUrl} className="w-full py-3 mt-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50">Lưu vào Kho Gốc</button>
+            </form>
           </div>
           <div className="lg:col-span-3">
-             <div className="overflow-x-auto rounded-2xl border border-slate-800/70 bg-slate-900/40 backdrop-blur-md">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
-                    <tr>
-                      <th className="px-5 py-4 font-semibold">Tài liệu & Mô tả</th>
-                      <th className="px-5 py-4 font-semibold hidden sm:table-cell">Lớp liên kết</th>
-                      <th className="px-5 py-4 font-semibold text-right">Thao tác</th>
+            <div className="overflow-x-auto rounded-2xl border border-slate-800/70 bg-slate-900/40 backdrop-blur-md">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="px-5 py-4 font-semibold">Tài liệu & Mô tả</th>
+                    <th className="px-5 py-4 font-semibold hidden sm:table-cell">Lớp liên kết</th>
+                    <th className="px-5 py-4 font-semibold text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {teachingDocs.map(d => (
+                    <tr key={d.id} className="group hover:bg-slate-800/40 transition-colors">
+                      <td className="px-5 py-4">
+                        <a href={d.url} target="_blank" rel="noopener noreferrer" className="font-bold text-slate-200 hover:text-emerald-400 flex items-center gap-2 transition-colors">
+                          <span>📄</span> {d.title}
+                        </a>
+                        {d.description && <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{d.description}</p>}
+                      </td>
+                      <td className="px-5 py-4 hidden sm:table-cell">
+                        <div className="flex flex-wrap gap-1.5">
+                          {d.classIds.length > 0 ? (
+                            d.classIds.map(cid => {
+                              const cls = classes.find(c => c.id === cid);
+                              return cls && <span key={cid} className="px-2 py-0.5 bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-bold rounded font-mono uppercase">{cls.courseCode}</span>
+                            })
+                          ) : <span className="text-xs italic text-slate-600">Chưa xếp lớp</span>}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button onClick={() => { if (window.confirm('Xóa tài liệu này?')) deleteDocument(d.id) }} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50">
-                    {teachingDocs.map(d => (
-                      <tr key={d.id} className="group hover:bg-slate-800/40 transition-colors">
-                        <td className="px-5 py-4">
-                           <a href={d.url} target="_blank" rel="noopener noreferrer" className="font-bold text-slate-200 hover:text-emerald-400 flex items-center gap-2 transition-colors">
-                             <span>📄</span> {d.title}
-                           </a>
-                           {d.description && <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{d.description}</p>}
-                        </td>
-                        <td className="px-5 py-4 hidden sm:table-cell">
-                          <div className="flex flex-wrap gap-1.5">
-                            {d.classIds.length > 0 ? (
-                              d.classIds.map(cid => {
-                                const cls = classes.find(c => c.id === cid);
-                                return cls && <span key={cid} className="px-2 py-0.5 bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-bold rounded font-mono uppercase">{cls.courseCode}</span>
-                              })
-                            ) : <span className="text-xs italic text-slate-600">Chưa xếp lớp</span>}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                           <button onClick={() => { if(window.confirm('Xóa tài liệu này?')) deleteDocument(d.id) }} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {teachingDocs.length === 0 && <tr><td colSpan={3} className="text-center py-20 text-slate-500 italic">Kho tài liệu trống.</td></tr>}
-                  </tbody>
-                </table>
-             </div>
+                  ))}
+                  {teachingDocs.length === 0 && <tr><td colSpan={3} className="text-center py-20 text-slate-500 italic">Kho tài liệu trống.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -344,7 +344,7 @@ export default function TeachingPage() {
         <>
           <div className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setSelectedClass(null)} />
           <div className="fixed inset-y-0 right-0 z-50 w-full md:w-2/3 lg:w-[85%] bg-slate-900 border-l border-slate-800 shadow-3xl flex flex-col h-full transform transition-transform animate-in slide-in-from-right duration-300">
-            
+
             <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-900/80 backdrop-blur-xl">
               <div>
                 <span className="text-[10px] font-bold tracking-widest uppercase text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-block mb-3 border border-blue-500/20">{selectedClass.courseCode}</span>
@@ -377,31 +377,31 @@ export default function TeachingPage() {
                     <div className="bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/20 shadow-lg sticky top-0">
                       <h3 className="text-sm font-bold text-indigo-300 mb-5 flex items-center gap-2"><span>➕</span> Thêm vào Lớp</h3>
                       <form onSubmit={handleAssignOrCreateStudentInClass} className="space-y-4">
-                         <div>
-                            <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Chọn từ Pool gốc</label>
-                            <select value={selectedStudentToAssign} onChange={e=>setSelectedStudentToAssign(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500">
-                               <option value="">-- Chọn một học viên --</option>
-                               {students.filter(s => !s.classIds.includes(selectedClass.id)).map(s => (
-                                 <option key={s.id} value={s.id}>{s.name} ({s.studentCode})</option>
-                               ))}
-                            </select>
-                         </div>
-                         {!selectedStudentToAssign && (
-                           <>
-                             <div className="relative flex items-center justify-center py-2"><span className="absolute bg-slate-900 px-2 text-[10px] text-slate-500 font-bold uppercase">Hoặc Tạo Mới</span><div className="w-full h-px bg-slate-800"></div></div>
-                             <div>
-                                <input type="text" placeholder="Họ tên SV..." value={studentName} onChange={e=>setStudentName(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 mb-3" />
-                                <input type="text" placeholder="MS học viên..." value={studentCode} onChange={e=>setStudentCode(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 font-mono text-center" />
-                             </div>
-                           </>
-                         )}
-                         <button type="submit" disabled={!selectedStudentToAssign && (!studentName || !studentCode)} className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-indigo-600/25">
-                           {selectedStudentToAssign ? 'Gán Học viên' : 'Tạo mới & Gán'}
-                         </button>
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Chọn từ Pool gốc</label>
+                          <select value={selectedStudentToAssign} onChange={e => setSelectedStudentToAssign(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="">-- Chọn một học viên --</option>
+                            {students.filter(s => !s.classIds.includes(selectedClass.id)).map(s => (
+                              <option key={s.id} value={s.id}>{s.name} ({s.studentCode})</option>
+                            ))}
+                          </select>
+                        </div>
+                        {!selectedStudentToAssign && (
+                          <>
+                            <div className="relative flex items-center justify-center py-2"><span className="absolute bg-slate-900 px-2 text-[10px] text-slate-500 font-bold uppercase">Hoặc Tạo Mới</span><div className="w-full h-px bg-slate-800"></div></div>
+                            <div>
+                              <input type="text" placeholder="Họ tên SV..." value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 mb-3" />
+                              <input type="text" placeholder="MS học viên..." value={studentCode} onChange={e => setStudentCode(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 font-mono text-center" />
+                            </div>
+                          </>
+                        )}
+                        <button type="submit" disabled={!selectedStudentToAssign && (!studentName || !studentCode)} className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-indigo-600/25">
+                          {selectedStudentToAssign ? 'Gán Học viên' : 'Tạo mới & Gán'}
+                        </button>
                       </form>
                     </div>
                   </div>
-                  
+
                   <div className="lg:col-span-2">
                     <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/20">
                       <table className="w-full text-left text-sm">
@@ -445,10 +445,10 @@ export default function TeachingPage() {
                 <div className="space-y-6">
                   <header className="flex items-center justify-between bg-slate-950/40 p-5 rounded-2xl border border-slate-800 shadow-inner">
                     <div className="flex gap-5 text-[10px] items-center">
-                       <span className="flex items-center gap-1.5 font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">✓ CÓ MẶT</span>
-                       <span className="flex items-center gap-1.5 font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded">✕ VẮNG</span>
-                       <span className="flex items-center gap-1.5 font-bold text-blue-400 bg-blue-400/10 px-2 py-1 rounded">✉️ CÓ PHÉP</span>
-                       <span className="flex items-center gap-1.5 font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded">⏰ MUỘN</span>
+                      <span className="flex items-center gap-1.5 font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">✓ CÓ MẶT</span>
+                      <span className="flex items-center gap-1.5 font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded">✕ VẮNG</span>
+                      <span className="flex items-center gap-1.5 font-bold text-blue-400 bg-blue-400/10 px-2 py-1 rounded">✉️ CÓ PHÉP</span>
+                      <span className="flex items-center gap-1.5 font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded">⏰ MUỘN</span>
                     </div>
                     <p className="text-[10px] text-slate-500 bg-slate-800/50 px-3 py-1 rounded-lg">Hướng dẫn: Click vào từng ô để xoay vòng trạng thái</p>
                   </header>
@@ -477,8 +477,8 @@ export default function TeachingPage() {
                               {sessions.map(date => {
                                 const attRecord = attendances.find((a: Attendance) => a.classId === selectedClass.id && a.studentId === stu.id && a.date === date);
                                 return (
-                                  <td 
-                                    key={date} 
+                                  <td
+                                    key={date}
                                     onClick={() => cycleStatus(selectedClass.id, stu.id, date, attRecord?.status)}
                                     className="px-2 py-4 text-center border-r border-slate-700 last:border-0 cursor-pointer hover:bg-slate-700/50 transition-all select-none"
                                   >
@@ -502,7 +502,7 @@ export default function TeachingPage() {
                   <form onSubmit={handleAddAssignment} className="bg-emerald-500/5 p-6 rounded-3xl border border-emerald-500/20 flex flex-col md:flex-row items-end gap-4 shadow-xl">
                     <div className="flex-1 space-y-4 w-full">
                       <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2"><span>✨</span> Giao Bài Mới</h3>
-                      <input type="text" required placeholder="Tên bài tập..." value={asgTitle} onChange={e=>setAsgTitle(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none" />
+                      <input type="text" required placeholder="Tên bài tập..." value={asgTitle} onChange={e => setAsgTitle(e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none" />
                     </div>
                     <div className="w-full md:w-48">
                       <label className="block text-[10px] uppercase font-bold text-slate-600 mb-1.5 ml-1">Hạn nộp</label>
@@ -510,7 +510,7 @@ export default function TeachingPage() {
                     </div>
                     <div className="w-full md:w-24">
                       <label className="block text-[10px] uppercase font-bold text-slate-600 mb-1.5 ml-1">Thang điểm</label>
-                      <input type="number" placeholder="10" value={asgPoints} onChange={e=>setAsgPoints(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-center font-bold" />
+                      <input type="number" placeholder="10" value={asgPoints} onChange={e => setAsgPoints(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-center font-bold" />
                     </div>
                     <button type="submit" disabled={!asgTitle || !asgDue || classStudents.length === 0} className="w-full md:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50 h-[46px]">GIAO BÀI</button>
                   </form>
@@ -536,7 +536,7 @@ export default function TeachingPage() {
                               </div>
                             </div>
                           </header>
-                          
+
                           <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
                               <thead className="text-[10px] uppercase font-bold text-slate-600 bg-slate-900/50 border-b border-slate-800">
@@ -557,7 +557,7 @@ export default function TeachingPage() {
                                       </td>
                                       <td className="px-6 py-3">
                                         <input type="number" value={sub.score ?? ''} onChange={e => updateSubmission(sub.id, { score: e.target.value ? Number(e.target.value) : undefined })}
-                                          placeholder={`/${asg.points||0}`} className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-center font-black transition-all ${sub.isMarked ? 'border-emerald-500/40 text-emerald-400' : 'border-slate-800 text-slate-400 focus:border-indigo-500'}`} />
+                                          placeholder={`/${asg.points || 0}`} className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-center font-black transition-all ${sub.isMarked ? 'border-emerald-500/40 text-emerald-400' : 'border-slate-800 text-slate-400 focus:border-indigo-500'}`} />
                                       </td>
                                       <td className="px-6 py-3 text-center">
                                         <input type="checkbox" checked={sub.isMarked} onChange={e => updateSubmission(sub.id, { isMarked: e.target.checked })}
@@ -580,25 +580,25 @@ export default function TeachingPage() {
               {activeTab === 'DOCUMENTS' && (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                   <div className="lg:col-span-1 border border-blue-500/20 bg-blue-500/5 backdrop-blur-xl rounded-3xl p-6 h-fit shadow-xl">
-                     <h3 className="text-sm font-bold text-blue-400 mb-5 flex items-center gap-2"><span>📎</span> Gán Tài Liệu</h3>
-                     <form onSubmit={handleAssignOrCreateDocInClass} className="space-y-4">
-                        <select value={selectedDocToAssign} onChange={e=>setSelectedDocToAssign(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
-                           <option value="">-- Chọn từ Pool gốc --</option>
-                           {teachingDocs.filter(d => !d.classIds.includes(selectedClass.id)).map(d => (
-                             <option key={d.id} value={d.id}>{d.title}</option>
-                           ))}
-                        </select>
-                        {!selectedDocToAssign && (
-                          <>
-                            <div className="relative flex items-center justify-center py-1"><span className="absolute bg-slate-900 px-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest">Hoặc Nhập Link</span><div className="w-full h-px bg-slate-800"></div></div>
-                            <input type="text" placeholder="Tên tài liệu..." value={docTitle} onChange={e=>setDocTitle(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100" />
-                            <input type="url" placeholder="https://..." value={docUrl} onChange={e=>setDocUrl(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100" />
-                          </>
-                        )}
-                        <button type="submit" disabled={!selectedDocToAssign && (!docTitle || !docUrl)} className="w-full py-3 mt-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/25 transition-all">
-                           Gán vào Lớp
-                        </button>
-                     </form>
+                    <h3 className="text-sm font-bold text-blue-400 mb-5 flex items-center gap-2"><span>📎</span> Gán Tài Liệu</h3>
+                    <form onSubmit={handleAssignOrCreateDocInClass} className="space-y-4">
+                      <select value={selectedDocToAssign} onChange={e => setSelectedDocToAssign(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Chọn từ Pool gốc --</option>
+                        {teachingDocs.filter(d => !d.classIds.includes(selectedClass.id)).map(d => (
+                          <option key={d.id} value={d.id}>{d.title}</option>
+                        ))}
+                      </select>
+                      {!selectedDocToAssign && (
+                        <>
+                          <div className="relative flex items-center justify-center py-1"><span className="absolute bg-slate-900 px-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest">Hoặc Nhập Link</span><div className="w-full h-px bg-slate-800"></div></div>
+                          <input type="text" placeholder="Tên tài liệu..." value={docTitle} onChange={e => setDocTitle(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100" />
+                          <input type="url" placeholder="https://..." value={docUrl} onChange={e => setDocUrl(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100" />
+                        </>
+                      )}
+                      <button type="submit" disabled={!selectedDocToAssign && (!docTitle || !docUrl)} className="w-full py-3 mt-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/25 transition-all">
+                        Gán vào Lớp
+                      </button>
+                    </form>
                   </div>
 
                   <div className="lg:col-span-3">
@@ -646,16 +646,16 @@ export default function TeachingPage() {
               <h2 className="text-2xl font-black text-slate-100">✨ Tạo Lớp Mới</h2>
               <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white text-3xl font-light">&times;</button>
             </div>
-            
+
             <form onSubmit={handleAddClass} className="p-7 space-y-5">
               <div className="grid grid-cols-2 gap-5">
                 <div>
                   <label className="block text-[10px] uppercase font-black text-slate-500 mb-1.5 ml-1">Mã học phần</label>
-                  <input type="text" required value={courseCode} onChange={e=>setCourseCode(e.target.value.toUpperCase())} placeholder="CS101" className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-4 py-3 text-slate-100 font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+                  <input type="text" required value={courseCode} onChange={e => setCourseCode(e.target.value.toUpperCase())} placeholder="CS101" className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-4 py-3 text-slate-100 font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase font-black text-slate-500 mb-1.5 ml-1">Tên lớp học</label>
-                  <input type="text" required value={name} onChange={e=>setName(e.target.value)} placeholder="Giải tích 1" className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-4 py-3 text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+                  <input type="text" required value={name} onChange={e => setName(e.target.value)} placeholder="Giải tích 1" className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-4 py-3 text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
                 </div>
               </div>
 
