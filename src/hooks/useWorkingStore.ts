@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-import type { WorkingProject, WorkingIssue, IssueStatus, IssueType, Priority, Task } from '../types';
+import type { WorkingProject, WorkingIssue, IssueType, Priority, Task } from '../types';
 
 export function useWorkingStore() {
   const projects = useLiveQuery(() => db.workingProjects.toArray()) || [];
