@@ -9,7 +9,7 @@ import {
   updateProfile
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
-import { doc, getDoc, setDoc, collection, query as fsQuery, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import type { User, UserRole } from '../types';
 
 interface AuthContextType {
@@ -96,10 +96,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const login = async (identifier: string, pass: string) => {
-    // Chuyển identifier về định dạng internal nếu không phải email
-    const finalEmail = identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s/g, '')}@justlife.id`;
-    const res = await signInWithEmailAndPassword(auth, finalEmail, pass);
+  const login = async (email: string, pass: string) => {
+    const res = await signInWithEmailAndPassword(auth, email, pass);
     import('../db').then(({ db: localDb }) => {
       localDb.loginLogs.add({
         id: crypto.randomUUID(),
@@ -110,28 +108,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const register = async (identifier: string, pass: string, name: string) => {
-    const isEmail = identifier.includes('@');
-    const username = isEmail ? identifier.split('@')[0] : identifier.toLowerCase().replace(/\s/g, '');
-    const finalEmail = isEmail ? identifier : `${username}@justlife.id`;
-
-    // 1. Kiểm tra username tồn tại chưa
-    const q = fsQuery(collection(db, "users"), where("username", "==", username));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      const error = new Error('Tên đăng nhập đã tồn tại.');
-      (error as any).code = 'auth/username-already-in-use';
-      throw error;
-    }
-
-    // 2. Tạo user trong Firebase Auth
-    const res = await createUserWithEmailAndPassword(auth, finalEmail, pass);
+  const register = async (email: string, pass: string, name: string) => {
+    const res = await createUserWithEmailAndPassword(auth, email, pass);
     await updateProfile(res.user, { displayName: name });
 
-    // 3. Khởi tạo user trong Firestore
+    // Khởi tạo user trong Firestore
     await setDoc(doc(db, "users", res.user.uid), {
-      email: isEmail ? finalEmail : null,
-      username: username,
+      email,
       name,
       role: 'user',
       createdAt: Date.now()
