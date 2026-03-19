@@ -5,7 +5,7 @@ import DateInput from '../components/ui/DateInput';
 import Badge from '../components/ui/Badge';
 import type { StudyDoc, Priority } from '../types';
 
-export default function StudyingPage() {
+export function StudyingPage() {
   const { tab } = useParams<{ tab: string }>();
   const activeTab = (tab?.toUpperCase() || 'COURSES') as 'COURSES' | 'ASSIGNMENTS' | 'DOCUMENTS';
 
@@ -374,3 +374,4 @@ export default function StudyingPage() {
     </div>
   );
 }
+export default StudyingPage;

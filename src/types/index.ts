@@ -139,3 +139,31 @@ export interface StudyDoc {
   description?: string;
   createdAt: number;
 }
+
+// ─── WORKING HUB (JIRA STYLE) ──────────────────────────────────────────────────
+export type IssueStatus = 'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE';
+export type IssueType = 'STORY' | 'TASK' | 'BUG' | 'EPIC';
+
+export interface WorkingProject {
+  id: string; // uuid
+  key: string; // e.g., "PROJ"
+  name: string;
+  description?: string;
+  lead: string; // User Name
+  createdAt: number;
+}
+
+export interface WorkingIssue {
+  id: string; // uuid
+  projectId: string;
+  key: string; // e.g., "PROJ-1"
+  title: string;
+  description?: string;
+  status: IssueStatus;
+  priority: Priority;
+  type: IssueType;
+  epicId?: string; // If this belongs to an epic
+  createdAt: number;
+  updatedAt: number;
+  dueDate?: string; // YYYY-MM-DD
+}

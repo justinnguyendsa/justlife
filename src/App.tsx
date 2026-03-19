@@ -7,12 +7,9 @@ import FocusPage from './pages/FocusPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import HabitPage from './pages/HabitPage';
 import TeachingPage from './pages/TeachingPage';
-import StudyingPage from './pages/StudyingPage';
+import { StudyingPage } from './pages/StudyingPage';
+import { WorkingPage } from './pages/WorkingPage';
 import SettingsPage from './pages/SettingsPage';
-
-// Placeholder Pages cho Working
-const WorkingPage = () => <div className="p-8"><h1 className="text-3xl font-bold text-slate-100">Working Hub</h1><p className="text-slate-400 mt-2">Đang phát triển...</p></div>;
-
 
 function App() {
   return (
@@ -25,11 +22,12 @@ function App() {
           <Route path="focus" element={<FocusPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="habits" element={<HabitPage />} />
-          <Route path="working" element={<WorkingPage />} />
           <Route path="teaching" element={<Navigate to="/teaching/classes" replace />} />
           <Route path="teaching/:tab" element={<TeachingPage />} />
           <Route path="studying" element={<Navigate to="/studying/courses" replace />} />
           <Route path="studying/:tab" element={<StudyingPage />} />
+          <Route path="working" element={<Navigate to="/working/projects" replace />} />
+          <Route path="working/:tab" element={<WorkingPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

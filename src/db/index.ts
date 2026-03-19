@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Task, Habit, HabitLog, Class, Student, Attendance, Assignment, Submission, TeachingDoc, StudyCourse, StudyAssignment, StudyDoc } from '../types';
+import type { Task, Habit, HabitLog, Class, Student, Attendance, Assignment, Submission, TeachingDoc, StudyCourse, StudyAssignment, StudyDoc, WorkingProject, WorkingIssue } from '../types';
 
 export class JustLifeDB extends Dexie {
   tasks!: Table<Task, string>;
@@ -14,6 +14,8 @@ export class JustLifeDB extends Dexie {
   studyCourses!: Table<StudyCourse, string>;
   studyAssignments!: Table<StudyAssignment, string>;
   studyDocs!: Table<StudyDoc, string>;
+  workingProjects!: Table<WorkingProject, string>;
+  workingIssues!: Table<WorkingIssue, string>;
   constructor() {
     super('JustLifeDB');
     this.version(1).stores({
@@ -50,6 +52,11 @@ export class JustLifeDB extends Dexie {
       studyCourses: 'id, courseCode, createdAt',
       studyAssignments: 'id, courseId, dueDate, status',
       studyDocs: 'id, courseId, createdAt'
+    });
+
+    this.version(6).stores({
+      workingProjects: 'id, key, name',
+      workingIssues: 'id, projectId, key, status, priority, type'
     });
   }
 }
