@@ -93,7 +93,9 @@ export default function AdminPage() {
                               </div>
                               <div>
                                 <p className="font-medium text-slate-200">{u.name}</p>
-                                <p className="text-[10px] text-slate-500">{u.username || u.email}</p>
+                                <p className="text-[10px] text-slate-500 font-mono italic">
+                                  {u.username || 'N/A'} {u.email ? `(${u.email})` : ''}
+                                </p>
                               </div>
                             </div>
                           </td>

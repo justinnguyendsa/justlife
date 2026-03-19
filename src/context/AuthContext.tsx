@@ -97,7 +97,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (identifier: string, pass: string) => {
-    const finalEmail = identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s/g, '')}@justlife.internal`;
+    // Chuyển identifier về định dạng internal nếu không phải email
+    const finalEmail = identifier.includes('@') ? identifier : `${identifier.toLowerCase().replace(/\s/g, '')}@justlife.id`;
     const res = await signInWithEmailAndPassword(auth, finalEmail, pass);
     import('../db').then(({ db: localDb }) => {
       localDb.loginLogs.add({
@@ -111,15 +112,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (identifier: string, pass: string, name: string) => {
     const isEmail = identifier.includes('@');
-    const finalEmail = isEmail ? identifier : `${identifier.toLowerCase().replace(/\s/g, '')}@justlife.internal`;
-    const username = isEmail ? identifier.split('@')[0] : identifier;
+    // Nếu identifier trống, sinh ID dựa trên name hoặc random
+    const baseId = identifier || `${name.toLowerCase().replace(/\s/g, '') || 'user'}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalEmail = isEmail ? identifier : `${baseId.toLowerCase().replace(/\s/g, '')}@justlife.id`;
+    const username = isEmail ? identifier.split('@')[0] : baseId;
 
     const res = await createUserWithEmailAndPassword(auth, finalEmail, pass);
     await updateProfile(res.user, { displayName: name });
 
     // Khởi tạo user trong Firestore
     await setDoc(doc(db, "users", res.user.uid), {
-      email: isEmail ? finalEmail : '',
+      email: isEmail ? finalEmail : null,
       username: username,
       name,
       role: 'user',
