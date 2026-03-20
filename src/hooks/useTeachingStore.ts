@@ -227,6 +227,35 @@ export const useTeachingStore = () => {
     await db.submissions.update(id, partial);
   }, []);
 
+  const submitWork = useCallback(async (assignmentId: string, studentCode: string, attachmentUrl: string) => {
+    await db.transaction('rw', [db.submissions, db.students], async () => {
+      // Find student by code
+      const student = await db.students.where({ studentCode }).first();
+      if (!student) throw new Error('Không tìm thấy học viên với mã số này.');
+
+      // Find submission for this assignment and student
+      const submission = await db.submissions.where({ assignmentId, studentId: student.id }).first();
+      if (!submission) throw new Error('Học viên không thuộc danh sách được giao bài tập này.');
+
+      // Archive current submission to history if it exists
+      const newHistory = [...(submission.history || [])];
+      if (submission.attachmentUrl && submission.submittedAt) {
+        newHistory.push({
+          attachmentUrl: submission.attachmentUrl,
+          submittedAt: submission.submittedAt
+        });
+      }
+
+      // Update submission with new data and archived history
+      await db.submissions.update(submission.id, {
+        attachmentUrl,
+        submittedAt: Date.now(),
+        isMarked: false,
+        history: newHistory
+      });
+    });
+  }, []);
+
   // --------------- DOCUMENTS POOL ----------------
   const addDocument = useCallback(async (title: string, url: string, description?: string, initialClassId?: string) => {
     await db.teachingDocs.add({
@@ -284,6 +313,7 @@ export const useTeachingStore = () => {
     updateAssignment,
     deleteAssignment,
     updateSubmission,
+    submitWork,
     addDocument,
     updateDocument,
     deleteDocument,

@@ -103,6 +103,11 @@ export interface Submission {
   score?: number;
   feedback?: string;
   isMarked: boolean;
+  history?: Array<{
+    attachmentUrl: string;
+    submittedAt: number;
+    studentNote?: string;
+  }>;
 }
 export interface TeachingDoc {
   id: string; // uuid

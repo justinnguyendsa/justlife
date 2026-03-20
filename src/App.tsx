@@ -9,6 +9,7 @@ import HabitPage from './pages/HabitPage';
 import TeachingPage from './pages/TeachingPage';
 import { StudyingPage } from './pages/StudyingPage';
 import { WorkingPage } from './pages/WorkingPage';
+import SubmissionPage from './pages/SubmissionPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import { AuthPage } from './pages/AuthPage';
@@ -59,10 +60,11 @@ const AppContent = () => {
           <Route path="teaching" element={<Navigate to="/teaching/classes" replace />} />
           <Route path="teaching/:tab" element={<TeachingPage />} />
           <Route path="studying" element={<Navigate to="/studying/courses" replace />} />
-          <Route path="studying/:tab" element={<StudyingPage />} />
+          <Route path="/studying/:tab?" element={<StudyingPage />} />
           <Route path="working" element={<Navigate to="/working/projects" replace />} />
           <Route path="working/:tab" element={<WorkingPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="/submit/:assignmentId" element={<SubmissionPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
 
