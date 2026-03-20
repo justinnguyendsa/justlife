@@ -41,7 +41,8 @@ const NAV_ITEMS: NavItem[] = [
     subItems: [
       { to: '/working/projects', label: 'Dự án' },
       { to: '/working/board', label: 'Bảng (Board)' },
-      { to: '/working/backlog', label: 'Kế hoạch (Backlog)' }
+      { to: '/working/backlog', label: 'Kế hoạch (Backlog)' },
+      { to: '/working/documents', label: 'Tài liệu' }
     ]
   },
   {

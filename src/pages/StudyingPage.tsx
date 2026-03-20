@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, NavLink } from 'react-router-dom';
 import { useStudyStore } from '../hooks/useStudyStore';
 import DateInput from '../components/ui/DateInput';
 import Badge from '../components/ui/Badge';
@@ -71,16 +71,16 @@ export function StudyingPage() {
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-3">
             Học tập & Nghiên cứu
           </h1>
-          <div className="flex bg-slate-800/50 p-1 rounded-xl w-fit">
-            <div className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'COURSES' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>
+          <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-slate-800/50 backdrop-blur-md w-fit no-scrollbar">
+            <NavLink to="/studying/courses" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               📚 Khóa học
-            </div>
-            <div className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'ASSIGNMENTS' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400'}`}>
+            </NavLink>
+            <NavLink to="/studying/assignments" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               📝 Deadline
-            </div>
-            <div className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'DOCUMENTS' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>
+            </NavLink>
+            <NavLink to="/studying/documents" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               📁 Tài liệu
-            </div>
+            </NavLink>
           </div>
         </div>
         {activeTab === 'COURSES' && (

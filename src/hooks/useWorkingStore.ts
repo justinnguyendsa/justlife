@@ -1,11 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-import type { WorkingProject, WorkingIssue, IssueType, Priority, Task } from '../types';
+import type { WorkingProject, WorkingIssue, IssueType, Priority, Task, WorkingDoc } from '../types';
 
 export function useWorkingStore() {
   const projects = useLiveQuery(() => db.workingProjects.toArray()) || [];
   const issues = useLiveQuery(() => db.workingIssues.toArray()) || [];
+  const workingDocs = useLiveQuery(() => db.workingDocs.toArray()) || [];
 
   const addProject = async (name: string, key: string, description?: string) => {
     const id = uuidv4();
@@ -22,12 +23,22 @@ export function useWorkingStore() {
   };
 
   const deleteProject = async (id: string) => {
-    await db.workingProjects.delete(id);
-    // Also delete associated issues? Usually yes for clean up
-    const assocIssues = await db.workingIssues.where('projectId').equals(id).toArray();
-    for (const issue of assocIssues) {
-      await deleteIssue(issue.id);
-    }
+    await db.transaction('rw', [db.workingProjects, db.workingIssues, db.workingDocs, db.tasks], async () => {
+      await db.workingProjects.delete(id);
+      
+      // Delete associated issues and their tasks
+      const assocIssues = await db.workingIssues.where('projectId').equals(id).toArray();
+      for (const issue of assocIssues) {
+        await db.workingIssues.delete(issue.id);
+        await db.tasks.delete(`WORK_${issue.id}`);
+      }
+
+      // Delete associated documents
+      const assocDocs = await db.workingDocs.where('projectId').equals(id).primaryKeys();
+      if (assocDocs.length > 0) {
+        await db.workingDocs.bulkDelete(assocDocs);
+      }
+    });
   };
 
   const syncToGlobalTasks = async (issue: WorkingIssue) => {
@@ -88,13 +99,40 @@ export function useWorkingStore() {
     await db.tasks.delete(`WORK_${id}`);
   };
 
+  // --------------- DOCUMENTS POOL ----------------
+  const addWorkingDoc = async (projectId: string, title: string, url: string, description?: string) => {
+    const id = uuidv4();
+    const newDoc: WorkingDoc = {
+      id,
+      projectId,
+      title,
+      url,
+      description,
+      createdAt: Date.now()
+    };
+    await db.workingDocs.add(newDoc);
+    return id;
+  };
+
+  const updateWorkingDoc = async (id: string, partial: Partial<WorkingDoc>) => {
+    await db.workingDocs.update(id, partial);
+  };
+
+  const deleteWorkingDoc = async (id: string) => {
+    await db.workingDocs.delete(id);
+  };
+
   return {
     projects,
     issues,
+    workingDocs,
     addProject,
     deleteProject,
     addIssue,
     updateIssue,
-    deleteIssue
+    deleteIssue,
+    addWorkingDoc,
+    updateWorkingDoc,
+    deleteWorkingDoc
   };
 }

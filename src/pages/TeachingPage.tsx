@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, NavLink } from 'react-router-dom';
 import { useTeachingStore } from '../hooks/useTeachingStore';
 import DateInput from '../components/ui/DateInput';
 import { readImportFile, parsePastedText, autoDetectMapping, type RawImportData } from '../utils/importHelpers';
@@ -215,16 +215,16 @@ export default function TeachingPage() {
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent mb-3">
             Giảng dạy & Lớp học
           </h1>
-          <div className="flex bg-slate-800/50 p-1 rounded-xl w-fit overflow-x-auto">
-            <div className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${mainTab === 'CLASSES' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>
+          <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-slate-800/50 backdrop-blur-md w-fit overflow-x-auto no-scrollbar">
+            <NavLink to="/teaching/classes" className={({ isActive }) => `px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               👨‍🏫 Lớp học ({classes.length})
-            </div>
-            <div className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${mainTab === 'STUDENTS' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>
+            </NavLink>
+            <NavLink to="/teaching/students" className={({ isActive }) => `px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               🎓 Kho Học viên ({students.length})
-            </div>
-            <div className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${mainTab === 'DOCUMENTS' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400'}`}>
+            </NavLink>
+            <NavLink to="/teaching/documents" className={({ isActive }) => `px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               📂 Kho Tài liệu ({teachingDocs.length})
-            </div>
+            </NavLink>
           </div>
         </div>
         {mainTab === 'CLASSES' && <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/25 text-sm transition-all whitespace-nowrap">+ Thêm Lớp</button>}

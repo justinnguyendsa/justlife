@@ -177,3 +177,12 @@ export interface WorkingIssue {
   updatedAt: number;
   dueDate?: string; // YYYY-MM-DD
 }
+
+export interface WorkingDoc {
+  id: string; // uuid
+  projectId: string;
+  title: string;
+  url: string;
+  description?: string;
+  createdAt: number;
+}

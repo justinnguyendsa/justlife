@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, NavLink } from 'react-router-dom';
 import { useWorkingStore } from '../hooks/useWorkingStore';
 import Badge from '../components/ui/Badge';
 import type { IssueStatus, IssueType, Priority } from '../types';
@@ -8,12 +8,13 @@ const STATUS_COLUMNS: IssueStatus[] = ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE'];
 
 export function WorkingPage() {
   const { tab } = useParams<{ tab: string }>();
-  const activeTab = (tab?.toUpperCase() || 'PROJECTS') as 'PROJECTS' | 'BOARD' | 'BACKLOG';
+  const activeTab = (tab?.toUpperCase() || 'PROJECTS') as 'PROJECTS' | 'BOARD' | 'BACKLOG' | 'DOCUMENTS';
 
   const {
-    projects, issues,
+    projects, issues, workingDocs,
     addProject, deleteProject,
-    addIssue, updateIssue, deleteIssue
+    addIssue, updateIssue, deleteIssue,
+    addWorkingDoc, deleteWorkingDoc
   } = useWorkingStore();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -38,6 +39,16 @@ export function WorkingPage() {
   const [iPriority, setIPriority] = useState<Priority>('MEDIUM');
   const [iDesc, setIDesc] = useState('');
   const [iProjectId, setIProjectId] = useState('');
+
+  // Working Doc States
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docTitle, setDocTitle] = useState('');
+  const [docUrl, setDocUrl] = useState('');
+  const [docDesc, setDocDesc] = useState('');
+  const [docProjectId, setDocProjectId] = useState('');
+
+  // Delete Confirm State
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'project' | 'issue' | 'doc', name: string } | null>(null);
 
   const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,30 +75,39 @@ export function WorkingPage() {
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent mb-3">
              Working Hub <span className="text-slate-600 font-light text-xl ml-2 tracking-normal italic">Jira Style</span>
           </h1>
-          <div className="flex bg-slate-800/50 p-1 rounded-xl w-fit">
-            <div className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'PROJECTS' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400'}`}>
+          <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-slate-800/50 backdrop-blur-md w-fit no-scrollbar overflow-x-auto">
+            <NavLink to="/working/projects" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               📁 Dự án
-            </div>
-            <div className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'BOARD' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>
+            </NavLink>
+            <NavLink to="/working/board" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               📊 Bảng (Board)
-            </div>
-            <div className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'BACKLOG' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>
+            </NavLink>
+            <NavLink to="/working/backlog" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
               📋 Backlog
-            </div>
+            </NavLink>
+            <NavLink to="/working/documents" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
+              📄 Tài liệu
+            </NavLink>
           </div>
         </div>
         <div className="flex gap-2">
            {activeTab === 'PROJECTS' && (
              <button onClick={() => setShowProjModal(true)} className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-cyan-600/20 text-sm transition-all whitespace-nowrap">+ Dự án Mới</button>
            )}
-           <button onClick={() => {
-              if (projects.length > 0) {
-                 setIProjectId(selectedProjectId || projects[0].id);
-                 setShowIssueModal(true);
-              } else {
-                 alert('Vui lòng tạo Dự án trước!');
-              }
-           }} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-600/20 text-sm transition-all whitespace-nowrap">+ Tạo Issue</button>
+            {activeTab === 'DOCUMENTS' && (
+              <button onClick={() => {
+                setDocProjectId(selectedProjectId || (projects.length > 0 ? projects[0].id : ''));
+                setShowDocModal(true);
+              }} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-600/20 text-sm transition-all whitespace-nowrap">+ Tài liệu Mới</button>
+            )}
+            <button onClick={() => {
+               if (projects.length > 0) {
+                  setIProjectId(selectedProjectId || projects[0].id);
+                  setShowIssueModal(true);
+               } else {
+                  alert('Vui lòng tạo Dự án trước!');
+               }
+            }} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-600/20 text-sm transition-all whitespace-nowrap">+ Tạo Issue</button>
         </div>
       </header>
 
@@ -121,7 +141,7 @@ export function WorkingPage() {
                          <span className="px-2 py-0.5 bg-slate-800 rounded-full font-bold text-slate-300">{pIssues.length}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                         <button onClick={(e) => { e.stopPropagation(); if(window.confirm('Xoá dự án này và tất cả Issue liên quan?')) deleteProject(p.id) }} className="p-2 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                         <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: p.id, type: 'project', name: p.name }) }} className="p-2 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                          </button>
                       </td>
@@ -184,9 +204,9 @@ export function WorkingPage() {
                                 <option value="REVIEW">REVIEW</option>
                                 <option value="DONE">DONE</option>
                              </select>
-                             <button onClick={() => deleteIssue(issue.id)} className="p-1.5 text-slate-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                             </button>
+                              <button onClick={() => setDeleteConfirm({ id: issue.id, type: 'issue', name: issue.key })} className="p-1.5 text-slate-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
                           </div>
                        </div>
                      ))}
@@ -251,6 +271,64 @@ export function WorkingPage() {
                  </tbody>
               </table>
            </div>
+        </div>
+      )}
+
+      {/* --- DOCUMENTS TAB --- */}
+      {activeTab === 'DOCUMENTS' && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 bg-slate-900/30 p-3 rounded-2xl border border-slate-800">
+             <span className="text-xs text-slate-500 font-bold uppercase ml-2">Lọc theo Dự án:</span>
+             <select value={selectedProjectId} onChange={e=>setSelectedProjectId(e.target.value)} className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-emerald-400 font-bold outline-none focus:ring-1 focus:ring-emerald-500">
+                <option value="">Tất cả Dự án</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+             </select>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+             <table className="w-full text-left text-sm">
+                <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Tên tài liệu / Liên kết</th>
+                    <th className="px-6 py-4 font-semibold hidden md:table-cell">Dự án</th>
+                    <th className="px-6 py-4 font-semibold hidden lg:table-cell">Mô tả</th>
+                    <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {(selectedProjectId ? workingDocs.filter(d => d.projectId === selectedProjectId) : workingDocs).map(doc => {
+                    const project = projects.find(p => p.id === doc.projectId);
+                    return (
+                      <tr key={doc.id} className="group hover:bg-slate-800/40 transition-colors">
+                        <td className="px-6 py-4">
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 group/link">
+                             <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg group-hover/link:bg-emerald-500 group-hover/link:text-white transition-all">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                             </div>
+                             <div>
+                                <p className="font-bold text-slate-200">{doc.title}</p>
+                                <p className="text-[10px] text-slate-500 truncate max-w-[200px]">{doc.url}</p>
+                             </div>
+                          </a>
+                        </td>
+                        <td className="px-6 py-4 hidden md:table-cell">
+                           <span className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-[10px] font-bold uppercase">{project?.name || 'Unknown'}</span>
+                        </td>
+                        <td className="px-6 py-4 hidden lg:table-cell text-slate-400 text-xs italic">
+                           {doc.description || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                           <button onClick={() => setDeleteConfirm({ id: doc.id, type: 'doc', name: doc.title })} className="p-2 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                           </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {workingDocs.length === 0 && <tr><td colSpan={4} className="py-20 text-center text-slate-500 italic">Chưa có tài liệu nào.</td></tr>}
+                </tbody>
+             </table>
+          </div>
         </div>
       )}
 
@@ -326,6 +404,83 @@ export function WorkingPage() {
                <button type="submit" className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all mt-2">TẠO ISSUE</button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* --- ADD DOCUMENT MODAL --- */}
+      {showDocModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-100">Thêm Tài liệu Dự án</h2>
+              <button onClick={() => setShowDocModal(false)} className="text-slate-500 hover:text-white text-3xl font-light">&times;</button>
+            </div>
+            <form onSubmit={async (e) => {
+               e.preventDefault();
+               if (!docTitle || !docUrl || !docProjectId) return;
+               await addWorkingDoc(docProjectId, docTitle, docUrl, docDesc);
+               setShowDocModal(false);
+               setDocTitle(''); setDocUrl(''); setDocDesc('');
+            }} className="p-6 space-y-4">
+               <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Dự án liên kết</label>
+                  <select value={docProjectId} onChange={e=>setDocProjectId(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 transition-all">
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+               </div>
+               <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Tiêu đề tài liệu</label>
+                  <input type="text" required value={docTitle} onChange={e=>setDocTitle(e.target.value)} placeholder="VD: Báo cáo phân tích" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+               </div>
+               <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Liên kết (Link)</label>
+                  <input type="url" required value={docUrl} onChange={e=>setDocUrl(e.target.value)} placeholder="https://..." className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+               </div>
+               <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5 ml-1">Mô tả (Tùy chọn)</label>
+                  <textarea value={docDesc} onChange={e=>setDocDesc(e.target.value)} rows={2} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none" />
+               </div>
+               <button type="submit" className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/20 transition-all">LƯU TÀI LIỆU</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- DELETE CONFIRM MODAL --- */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+           <div className="bg-slate-900 border border-red-500/30 rounded-[2.5rem] w-full max-w-sm shadow-[0_0_50px_-12px_rgba(239,68,68,0.3)] overflow-hidden">
+              <div className="pt-10 pb-6 px-8 text-center">
+                 <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
+                    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                 </div>
+                 <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Xác nhận xóa?</h2>
+                 <p className="text-slate-400 text-sm leading-relaxed px-4">
+                    Bạn có chắc chắn muốn xóa {deleteConfirm.type === 'project' ? 'Dự án' : deleteConfirm.type === 'issue' ? 'Issue' : 'Tài liệu'} 
+                    <span className="block font-bold text-red-400 mt-1">"{deleteConfirm.name}"</span>
+                    Hành động này không thể hoàn tác.
+                 </p>
+              </div>
+              <div className="p-6 bg-slate-950/50 flex gap-3">
+                 <button 
+                   onClick={() => setDeleteConfirm(null)}
+                   className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-2xl transition-all"
+                 >
+                    HỦY
+                 </button>
+                 <button 
+                   onClick={async () => {
+                     if (deleteConfirm.type === 'project') await deleteProject(deleteConfirm.id);
+                     else if (deleteConfirm.type === 'issue') await deleteIssue(deleteConfirm.id);
+                     else if (deleteConfirm.type === 'doc') await deleteWorkingDoc(deleteConfirm.id);
+                     setDeleteConfirm(null);
+                   }}
+                   className="flex-1 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl shadow-lg shadow-red-600/30 transition-all"
+                 >
+                    XÓA BỎ
+                 </button>
+              </div>
+           </div>
         </div>
       )}
     </div>
