@@ -71,6 +71,10 @@ export class JustLifeDB extends Dexie {
     this.version(8).stores({
       workingDocs: 'id, projectId, createdAt'
     });
+
+    this.version(9).stores({
+      workingDocs: 'id, projectId, createdAt, fileType'
+    });
   }
 }
 

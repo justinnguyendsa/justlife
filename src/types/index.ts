@@ -190,4 +190,9 @@ export interface WorkingDoc {
   url: string;
   description?: string;
   createdAt: number;
+  // File upload fields (only set for locally-uploaded files)
+  fileType?: 'md' | 'csv' | 'xlsx' | 'sql';
+  fileContent?: string; // raw text for md/csv/sql; base64 for xlsx
+  fileName?: string;
+  fileSize?: number; // bytes
 }

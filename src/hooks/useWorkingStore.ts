@@ -99,6 +99,39 @@ export function useWorkingStore() {
     await db.tasks.delete(`WORK_${id}`);
   };
 
+  const addWorkingFileDoc = async (projectId: string, title: string, file: File, description?: string) => {
+    const id = uuidv4();
+    const ext = file.name.split('.').pop()?.toLowerCase() as 'md' | 'csv' | 'xlsx' | 'sql';
+
+    const readContent = (): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => reject(new Error('File read failed'));
+        if (ext === 'xlsx') {
+          reader.readAsDataURL(file);
+        } else {
+          reader.readAsText(file, 'utf-8');
+        }
+      });
+
+    const fileContent = await readContent();
+    const newDoc: WorkingDoc = {
+      id,
+      projectId,
+      title,
+      url: '',
+      description,
+      createdAt: Date.now(),
+      fileType: ext,
+      fileContent,
+      fileName: file.name,
+      fileSize: file.size,
+    };
+    await db.workingDocs.add(newDoc);
+    return id;
+  };
+
   // --------------- DOCUMENTS POOL ----------------
   const addWorkingDoc = async (projectId: string, title: string, url: string, description?: string) => {
     const id = uuidv4();
@@ -132,6 +165,7 @@ export function useWorkingStore() {
     updateIssue,
     deleteIssue,
     addWorkingDoc,
+    addWorkingFileDoc,
     updateWorkingDoc,
     deleteWorkingDoc
   };

@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, NavLink } from 'react-router-dom';
 import { useWorkingStore } from '../hooks/useWorkingStore';
 import Badge from '../components/ui/Badge';
-import type { IssueStatus, IssueType, Priority } from '../types';
+import MarkdownPreview from '../components/ui/MarkdownPreview';
+import type { IssueStatus, IssueType, Priority, WorkingDoc } from '../types';
+import * as XLSX from 'xlsx';
 
 const STATUS_COLUMNS: IssueStatus[] = ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE'];
 
@@ -14,7 +16,7 @@ export function WorkingPage() {
     projects, issues, workingDocs,
     addProject, deleteProject,
     addIssue, updateIssue, deleteIssue,
-    addWorkingDoc, deleteWorkingDoc
+    addWorkingDoc, addWorkingFileDoc, deleteWorkingDoc
   } = useWorkingStore();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -50,6 +52,15 @@ export function WorkingPage() {
   // Delete Confirm State
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'project' | 'issue' | 'doc', name: string } | null>(null);
 
+  // Documents sub-tab & file states
+  const [docSubTab, setDocSubTab] = useState<'LINKS' | 'FILES'>('LINKS');
+  const [previewDoc, setPreviewDoc] = useState<WorkingDoc | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [csvPreviewData, setCsvPreviewData] = useState<{ headers: string[], rows: string[][] } | null>(null);
+  const [xlsxPreviewData, setXlsxPreviewData] = useState<{ headers: string[], rows: string[][] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pName || !pKey) return;
@@ -67,6 +78,56 @@ export function WorkingPage() {
     setShowIssueModal(false);
     setITitle(''); setIDesc('');
   };
+
+  const ACCEPTED_EXTS = ['.md', '.csv', '.xlsx', '.sql'];
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ACCEPTED_EXTS.includes(ext)) {
+      setUploadError(`Chỉ hỗ trợ: ${ACCEPTED_EXTS.join(', ')}`);
+      return;
+    }
+    setUploadError('');
+    const projId = selectedProjectId || (projects.length > 0 ? projects[0].id : '');
+    if (!projId) { setUploadError('Vui lòng chọn dự án trước!'); return; }
+    try {
+      await addWorkingFileDoc(projId, file.name, file);
+    } catch (e) {
+      setUploadError('Lỗi khi đọc file.');
+    }
+  }, [selectedProjectId, projects, addWorkingFileDoc]);
+
+  // Parse CSV string → { headers, rows }
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return { headers: [], rows: [] };
+    const sep = lines[0].includes('\t') ? '\t' : ',';
+    const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g, ''));
+    const rows = lines.slice(1).map(l => l.split(sep).map(c => c.trim().replace(/^"|"$/g, '')));
+    return { headers, rows };
+  };
+
+  // When previewDoc changes → parse CSV or XLSX
+  useEffect(() => {
+    setCsvPreviewData(null);
+    setXlsxPreviewData(null);
+    if (!previewDoc) return;
+    if (previewDoc.fileType === 'csv' && previewDoc.fileContent) {
+      setCsvPreviewData(parseCSV(previewDoc.fileContent));
+    }
+    if (previewDoc.fileType === 'xlsx' && previewDoc.fileContent) {
+      try {
+        // fileContent is a data URL: "data:...;base64,<data>"
+        const base64 = previewDoc.fileContent.split(',')[1];
+        const wb = XLSX.read(base64, { type: 'base64' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const headers = (json[0] || []).map(String);
+        const rows = json.slice(1).map(r => headers.map((_, i) => String(r[i] ?? '')));
+        setXlsxPreviewData({ headers, rows });
+      } catch { /* ignore */ }
+    }
+  }, [previewDoc]);
 
   return (
     <div className="space-y-6">
@@ -276,59 +337,309 @@ export function WorkingPage() {
 
       {/* --- DOCUMENTS TAB --- */}
       {activeTab === 'DOCUMENTS' && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 bg-slate-900/30 p-3 rounded-2xl border border-slate-800">
-             <span className="text-xs text-slate-500 font-bold uppercase ml-2">Lọc theo Dự án:</span>
-             <select value={selectedProjectId} onChange={e=>setSelectedProjectId(e.target.value)} className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-emerald-400 font-bold outline-none focus:ring-1 focus:ring-emerald-500">
-                <option value="">Tất cả Dự án</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-             </select>
+        <div className="space-y-4">
+          {/* Sub-tab switcher */}
+          <div className="flex bg-slate-800/50 p-1 rounded-xl border border-slate-800 w-fit">
+            <button onClick={() => setDocSubTab('LINKS')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                docSubTab === 'LINKS' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}>🔗 Liên kết</button>
+            <button onClick={() => setDocSubTab('FILES')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                docSubTab === 'FILES' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}>📁 Tệp tin</button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
-             <table className="w-full text-left text-sm">
-                <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
-                  <tr>
-                    <th className="px-6 py-4 font-semibold">Tên tài liệu / Liên kết</th>
-                    <th className="px-6 py-4 font-semibold hidden md:table-cell">Dự án</th>
-                    <th className="px-6 py-4 font-semibold hidden lg:table-cell">Mô tả</th>
-                    <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {(selectedProjectId ? workingDocs.filter(d => d.projectId === selectedProjectId) : workingDocs).map(doc => {
-                    const project = projects.find(p => p.id === doc.projectId);
-                    return (
-                      <tr key={doc.id} className="group hover:bg-slate-800/40 transition-colors">
-                        <td className="px-6 py-4">
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 group/link">
-                             <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg group-hover/link:bg-emerald-500 group-hover/link:text-white transition-all">
+          {/* ---- LINKS subtab ---- */}
+          {docSubTab === 'LINKS' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 bg-slate-900/30 p-3 rounded-2xl border border-slate-800">
+                <span className="text-xs text-slate-500 font-bold uppercase ml-2">Lọc theo Dự án:</span>
+                <select value={selectedProjectId} onChange={e=>setSelectedProjectId(e.target.value)} className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-emerald-400 font-bold outline-none focus:ring-1 focus:ring-emerald-500">
+                  <option value="">Tất cả Dự án</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="px-6 py-4 font-semibold">Tên tài liệu / Liên kết</th>
+                      <th className="px-6 py-4 font-semibold hidden md:table-cell">Dự án</th>
+                      <th className="px-6 py-4 font-semibold hidden lg:table-cell">Mô tả</th>
+                      <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50">
+                    {(selectedProjectId ? workingDocs.filter(d => d.projectId === selectedProjectId) : workingDocs)
+                      .filter(d => !d.fileType)
+                      .map(doc => {
+                      const project = projects.find(p => p.id === doc.projectId);
+                      return (
+                        <tr key={doc.id} className="group hover:bg-slate-800/40 transition-colors">
+                          <td className="px-6 py-4">
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 group/link">
+                              <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg group-hover/link:bg-emerald-500 group-hover/link:text-white transition-all">
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                             </div>
-                             <div>
+                              </div>
+                              <div>
                                 <p className="font-bold text-slate-200">{doc.title}</p>
                                 <p className="text-[10px] text-slate-500 truncate max-w-[200px]">{doc.url}</p>
-                             </div>
-                          </a>
-                        </td>
-                        <td className="px-6 py-4 hidden md:table-cell">
-                           <span className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-[10px] font-bold uppercase">{project?.name || 'Unknown'}</span>
-                        </td>
-                        <td className="px-6 py-4 hidden lg:table-cell text-slate-400 text-xs italic">
-                           {doc.description || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                           <button onClick={() => setDeleteConfirm({ id: doc.id, type: 'doc', name: doc.title })} className="p-2 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                           </button>
-                        </td>
-                      </tr>
+                              </div>
+                            </a>
+                          </td>
+                          <td className="px-6 py-4 hidden md:table-cell">
+                            <span className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-[10px] font-bold uppercase">{project?.name || 'Unknown'}</span>
+                          </td>
+                          <td className="px-6 py-4 hidden lg:table-cell text-slate-400 text-xs italic">{doc.description || 'N/A'}</td>
+                          <td className="px-6 py-4 text-right">
+                            <button onClick={() => setDeleteConfirm({ id: doc.id, type: 'doc', name: doc.title })} className="p-2 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {workingDocs.filter(d => !d.fileType).length === 0 && <tr><td colSpan={4} className="py-20 text-center text-slate-500 italic">Chưa có tài liệu nào.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ---- FILES subtab ---- */}
+          {docSubTab === 'FILES' && (
+            <div className="flex rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/40 shadow-2xl" style={{ height: 'calc(100vh - 230px)', minHeight: '520px' }}>
+
+              {/* LEFT SIDEBAR */}
+              <div className="w-72 flex-shrink-0 border-r border-slate-800 flex flex-col bg-slate-900/60">
+                {/* Toolbar row */}
+                <div className="px-4 py-3 border-b border-slate-800 bg-slate-950/50 flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex-1">TÀI LIỆU</span>
+                  <select value={selectedProjectId} onChange={e=>setSelectedProjectId(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-[10px] text-violet-400 font-bold outline-none max-w-[110px] truncate">
+                    <option value="">Tất cả</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+
+                {/* Compact upload zone */}
+                <div
+                  className={`mx-3 mt-3 mb-2 border-2 border-dashed rounded-xl p-4 flex items-center gap-3 cursor-pointer transition-all flex-shrink-0 ${
+                    isDragOver ? 'border-violet-500 bg-violet-500/10' : 'border-slate-700 hover:border-violet-500/60 bg-slate-900/30'
+                  }`}
+                  onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setIsDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f); }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input ref={fileInputRef} type="file" accept=".md,.csv,.xlsx,.sql" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }} />
+                  <span className="text-2xl flex-shrink-0">📤</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-300 leading-tight">Upload tài liệu</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">.md · .csv · .xlsx · .sql</p>
+                    {uploadError && <p className="text-[10px] text-red-400 mt-1 font-bold">{uploadError}</p>}
+                  </div>
+                </div>
+
+                {/* File list – independently scrollable */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-3 pt-1 space-y-0.5">
+                  {(selectedProjectId
+                    ? workingDocs.filter(d => d.fileType && d.projectId === selectedProjectId)
+                    : workingDocs.filter(d => d.fileType)
+                  ).sort((a, b) => b.createdAt - a.createdAt).map(doc => {
+                    const isActive = previewDoc?.id === doc.id;
+                    const typeColors: Record<string, string> = {
+                      md: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                      csv: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                      xlsx: 'bg-green-500/20 text-green-300 border-green-500/30',
+                      sql: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                    };
+                    const typeIcons: Record<string, string> = { md: '📝', csv: '📊', xlsx: '📋', sql: '🗃️' };
+                    return (
+                      <div key={doc.id}
+                        onClick={() => setPreviewDoc(isActive ? null : doc)}
+                        className={`group flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                          isActive
+                            ? 'border-violet-500/60 bg-violet-500/15 shadow-lg shadow-violet-500/10'
+                            : 'border-transparent hover:border-slate-700/80 hover:bg-slate-800/50'
+                        }`}
+                      >
+                        <span className="text-base flex-shrink-0">{typeIcons[doc.fileType!] || '📄'}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs font-bold truncate leading-tight ${
+                            isActive ? 'text-violet-200' : 'text-slate-300 group-hover:text-slate-100'
+                          }`}>
+                            {doc.fileName || doc.title}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[9px] font-black uppercase px-1 py-0.5 rounded border ${
+                              typeColors[doc.fileType!] || 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>.{doc.fileType}</span>
+                            {doc.fileSize && (
+                              <span className="text-[9px] text-slate-600">{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (previewDoc?.id === doc.id) setPreviewDoc(null);
+                            setDeleteConfirm({ id: doc.id, type: 'doc', name: doc.fileName || doc.title });
+                          }}
+                          className="p-1 text-slate-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     );
                   })}
-                  {workingDocs.length === 0 && <tr><td colSpan={4} className="py-20 text-center text-slate-500 italic">Chưa có tài liệu nào.</td></tr>}
-                </tbody>
-             </table>
-          </div>
+                  {workingDocs.filter(d => d.fileType).length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-40 text-center">
+                      <span className="text-3xl mb-2 opacity-20">📂</span>
+                      <p className="text-xs text-slate-600 italic">Chưa có tệp nào</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT PREVIEW PANEL */}
+              <div className="flex-1 min-w-0 flex flex-col bg-slate-950/10">
+                {previewDoc ? (
+                  <>
+                    {/* Toolbar */}
+                    <div className="flex items-center justify-between px-5 py-2.5 border-b border-slate-800 bg-slate-950/70 flex-shrink-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 border border-slate-700/80 rounded-lg max-w-[400px]">
+                          <span className="text-sm flex-shrink-0">
+                            {previewDoc.fileType === 'md' ? '📝' : previewDoc.fileType === 'csv' ? '📊' : previewDoc.fileType === 'xlsx' ? '📋' : '🗃️'}
+                          </span>
+                          <span className="text-xs font-bold text-slate-200 truncate">{previewDoc.fileName || previewDoc.title}</span>
+                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded flex-shrink-0 ${
+                            previewDoc.fileType === 'md'   ? 'bg-blue-500/20 text-blue-300' :
+                            previewDoc.fileType === 'csv'  ? 'bg-emerald-500/20 text-emerald-300' :
+                            previewDoc.fileType === 'xlsx' ? 'bg-green-500/20 text-green-300' :
+                            'bg-amber-500/20 text-amber-300'
+                          }`}>.{previewDoc.fileType}</span>
+                        </div>
+                        {previewDoc.fileSize && (
+                          <span className="text-[10px] text-slate-600 hidden sm:block">
+                            {(previewDoc.fileSize / 1024).toFixed(1)} KB
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {previewDoc.fileContent && (
+                          <a
+                            href={previewDoc.fileType === 'xlsx'
+                              ? previewDoc.fileContent
+                              : `data:text/plain;charset=utf-8,${encodeURIComponent(previewDoc.fileContent)}`}
+                            download={previewDoc.fileName || previewDoc.title}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-violet-600 text-slate-400 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 hover:border-violet-500"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Tải xuống
+                          </a>
+                        )}
+                        <button
+                          onClick={() => setPreviewDoc(null)}
+                          className="p-1.5 text-slate-500 hover:text-white bg-slate-800 hover:bg-red-500/20 border border-slate-700 hover:border-red-500/40 rounded-lg transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Scrollable content area */}
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+
+                      {/* Markdown – VSCode rendered */}
+                      {previewDoc.fileType === 'md' && previewDoc.fileContent && (
+                        <div className="px-10 py-8 max-w-4xl">
+                          <MarkdownPreview content={previewDoc.fileContent} />
+                        </div>
+                      )}
+
+                      {/* SQL */}
+                      {previewDoc.fileType === 'sql' && (
+                        <div className="p-6">
+                          <pre className="text-sm text-amber-200 whitespace-pre-wrap font-mono leading-relaxed bg-slate-950/80 p-6 rounded-xl border border-slate-800/80">{previewDoc.fileContent}</pre>
+                        </div>
+                      )}
+
+                      {/* CSV – sticky header, zebra rows */}
+                      {previewDoc.fileType === 'csv' && csvPreviewData && (
+                        <div className="overflow-x-auto">
+                          <table className="text-left text-xs border-collapse min-w-full">
+                            <thead className="bg-slate-800/90 text-slate-400 uppercase tracking-wider sticky top-0 z-10 shadow">
+                              <tr>
+                                {csvPreviewData.headers.map((h, i) => (
+                                  <th key={i} className="px-4 py-3 border-b border-r border-slate-700/80 font-bold whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {csvPreviewData.rows.map((row, ri) => (
+                                <tr key={ri} className={`hover:bg-violet-500/5 transition-colors ${ri % 2 === 1 ? 'bg-slate-900/40' : ''}`}>
+                                  {csvPreviewData.headers.map((_, ci) => (
+                                    <td key={ci} className="px-4 py-2.5 border-b border-r border-slate-800/60 text-slate-300 whitespace-nowrap">{row[ci] ?? ''}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* XLSX – sticky header, zebra rows */}
+                      {previewDoc.fileType === 'xlsx' && xlsxPreviewData && (
+                        <div className="overflow-x-auto">
+                          <table className="text-left text-xs border-collapse min-w-full">
+                            <thead className="bg-slate-800/90 text-slate-400 uppercase tracking-wider sticky top-0 z-10 shadow">
+                              <tr>
+                                {xlsxPreviewData.headers.map((h, i) => (
+                                  <th key={i} className="px-4 py-3 border-b border-r border-slate-700/80 font-bold whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {xlsxPreviewData.rows.map((row, ri) => (
+                                <tr key={ri} className={`hover:bg-violet-500/5 transition-colors ${ri % 2 === 1 ? 'bg-slate-900/40' : ''}`}>
+                                  {xlsxPreviewData.headers.map((_, ci) => (
+                                    <td key={ci} className="px-4 py-2.5 border-b border-r border-slate-800/60 text-slate-300 whitespace-nowrap">{row[ci] ?? ''}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {previewDoc.fileType === 'xlsx' && !xlsxPreviewData && (
+                        <div className="flex items-center justify-center h-40">
+                          <p className="text-slate-500 italic text-sm">Đang xử lý XLSX...</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* Empty state */
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
+                    <div className="w-24 h-24 rounded-3xl bg-slate-800/40 border border-slate-700/50 flex items-center justify-center text-5xl mb-6 shadow-inner opacity-60">📄</div>
+                    <h3 className="text-slate-400 font-bold text-xl mb-2">Chọn tệp để xem</h3>
+                    <p className="text-slate-600 text-sm max-w-xs leading-relaxed">Click vào một tệp bên trái để xem preview nội dung tại đây.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
