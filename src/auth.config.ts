@@ -65,8 +65,8 @@ export const authConfig = {
       if (user) {
         if (account?.provider === "google") {
           // Chủ sở hữu: chỉ cấp role owner nếu email khớp OWNER_EMAIL (so khớp không phân biệt hoa/thường).
-          const owner = process.env.OWNER_EMAIL?.toLowerCase();
-          const email = user.email?.toLowerCase();
+          const owner = process.env.OWNER_EMAIL?.toLowerCase().trim();
+          const email = user.email?.toLowerCase().trim();
           token.role = owner && email && email === owner ? "owner" : "guest";
           // KHÔNG lưu studentId cho owner.
           token.studentId = undefined;

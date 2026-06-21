@@ -60,11 +60,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     //  - access-code: giữ nguyên (authorize đã kiểm mã) → cho qua.
     async signIn({ account, profile, user }) {
       if (account?.provider === "google") {
-        const owner = process.env.OWNER_EMAIL?.toLowerCase();
+        // .trim() phòng khi giá trị env dính khoảng trắng/xuống dòng khi dán vào dashboard.
+        const owner = process.env.OWNER_EMAIL?.toLowerCase().trim();
         // Ưu tiên email đã verify từ profile Google; fallback user.email.
-        const email = (profile?.email ?? user?.email)?.toLowerCase();
+        const email = (profile?.email ?? user?.email)?.toLowerCase().trim();
         const verified = profile?.email_verified !== false; // Google trả true cho tài khoản hợp lệ
         if (!owner || !email || email !== owner || !verified) {
+          // 🔎 Chẩn đoán (masked) → xem ở Vercel → Deployment → Runtime Logs.
+          //    KHÔNG in email đầy đủ; chỉ đủ để biết vì sao bị từ chối.
+          console.error("[owner-signin] REJECT", {
+            ownerEnvSet: Boolean(owner),
+            ownerEnvLen: owner?.length ?? 0, // email thật ~ 13 ký tự; nếu lớn bất thường = dính comment
+            emailSet: Boolean(email),
+            emailDomain: email?.split("@")[1] ?? null,
+            match: owner === email,
+            verified,
+          });
           return false; // người lạ / email chưa verify → TỪ CHỐI
         }
         return true;
