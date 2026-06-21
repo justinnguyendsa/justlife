@@ -44,19 +44,12 @@ export const authConfig = {
   pages: {
     // Mặc định cho lớp middleware là cổng học viên; owner redirect /login được xử riêng trong authorized().
     signIn: "/portal/login",
+    // Lỗi auth (vd AccessDenied / OAuthCallback) → đưa về /login kèm ?error= để HIỆN mã lỗi.
+    error: "/login",
   },
-  // Cookie cứng: httpOnly + SameSite=Lax; Secure tự bật khi chạy production (https).
-  cookies: {
-    sessionToken: {
-      name: "authjs.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-  },
+  // KHÔNG ghi đè cookie: để Auth.js dùng mặc định chuẩn (prod tự thêm tiền tố __Secure-,
+  // httpOnly + SameSite=Lax + Secure). Việc ép tên "authjs.session-token" ở prod (https) trước đây
+  // KHÔNG chuẩn → có thể khiến phiên không được lưu/đọc đúng trên Vercel.
   callbacks: {
     // Gắn danh tính vào token KHI đăng nhập.
     //  - Học viên (access-code): id + cờ học viên, role "student" — KHÔNG lưu tên/email (chống lộ PII).

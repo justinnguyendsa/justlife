@@ -15,8 +15,32 @@ export const metadata: Metadata = {
 // 🗣️ Bình dân: khi app ở trên mạng, Minh bấm "Đăng nhập với Google" để vào nhà mình.
 //    Khi chạy ở máy thì khỏi đăng nhập — bấm là vào luôn.
 
-export default async function OwnerLoginPage() {
+// Chuyển mã lỗi Auth.js → câu tiếng Việt dễ hiểu (giúp chẩn đoán nhanh).
+function authErrorMessage(code: string): string {
+  switch (code) {
+    case "AccessDenied":
+      return "Tài khoản Google vừa dùng KHÔNG khớp OWNER_EMAIL → hãy đăng nhập đúng Gmail đã cấu hình (thử cửa sổ ẩn danh).";
+    case "Configuration":
+      return "Lỗi cấu hình máy chủ (thiếu/sai biến: AUTH_SECRET / Google / OWNER_EMAIL).";
+    case "OAuthSignin":
+    case "OAuthCallback":
+    case "OAuthCallbackError":
+    case "Callback":
+      return "Lỗi OAuth khi quay lại từ Google (cookie state/PKCE không khớp).";
+    case "Verification":
+      return "Phiên xác thực đã hết hạn. Vui lòng thử lại.";
+    default:
+      return "Đăng nhập không thành công.";
+  }
+}
+
+export default async function OwnerLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const enabled = isOwnerAuthEnabled();
+  const { error } = await searchParams;
 
   // Đã đăng nhập owner rồi → khỏi ở lại trang login.
   if (enabled) {
@@ -59,6 +83,25 @@ export default async function OwnerLoginPage() {
             <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: "var(--space-1)" }}>
               Khu cá nhân và khu dạy học chỉ dành cho chủ sở hữu. Vui lòng đăng nhập bằng Google.
             </p>
+
+            {error && (
+              <div
+                style={{
+                  marginTop: "var(--space-4)",
+                  padding: "var(--space-3)",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--danger-soft, #fdecea)",
+                  border: "1px solid var(--danger, #d92d20)",
+                  color: "var(--danger, #b42318)",
+                  fontSize: 13,
+                }}
+              >
+                {authErrorMessage(error)}
+                <div style={{ marginTop: 4, fontSize: 11, opacity: 0.85 }}>
+                  Mã lỗi: <b>{error}</b>
+                </div>
+              </div>
+            )}
 
             <div style={{ marginTop: "var(--space-5)" }}>
               <OwnerSignIn />
