@@ -23,7 +23,7 @@ export function ownerAuthEnabledEnv(): boolean {
 //  - /api/auth         : endpoint nội bộ Auth.js (signin/callback/csrf…)
 //  - /share            : LINK CHIA SẺ công khai (tài liệu gửi người ngoài) — không được khoá
 //  - /api/library/file : phục vụ file cho link chia sẻ ở trên (dùng chung) — phải mở
-const ALWAYS_PUBLIC_PREFIXES = ["/api/auth", "/share/", "/api/library/file"];
+const ALWAYS_PUBLIC_PREFIXES = ["/api/auth", "/share/", "/api/library/file", "/api/debug-auth"];
 const ALWAYS_PUBLIC_EXACT = ["/login", "/portal/login"];
 
 function isAlwaysPublic(path: string): boolean {
