@@ -1,73 +1,32 @@
-# React + TypeScript + Vite
+# justlife — Personal OS (MVP / Phase 1)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Webapp quản lý cuộc sống cá nhân. MVP: **Quản lý việc + Deadline** — Capture → Prioritize/Focus → Time-block → Deadline Guard. Responsive **laptop + điện thoại**.
 
-Currently, two official plugins are available:
+> Stack: Next.js 15 (App Router) · TypeScript · Drizzle + libSQL (local-first, sync-ready) · CSS variables (`src/styles/tokens.css`) · lucide-react. Thiết kế: Cobalt & Amber, tiếng Việt 100%.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Chạy local
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run db:setup     # tạo bảng + seed dữ liệu mẫu (file local.db)
+npm run dev          # http://localhost:3000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Mở trên điện thoại cùng mạng: `http://<IP-máy>:3000`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Cấu trúc
 ```
+src/
+  app/(app)/{today,tasks,calendar,deadlines,settings}/   ← các màn (route group personal)
+  app/actions/        ← server actions (mutations)
+  components/          ← UI tái dùng
+  db/                 ← schema · client · migrate · seed (personal.db)
+  lib/                ← priority · scheduler · escalation · format (Asia/Ho_Chi_Minh)
+  styles/tokens.css   ← design tokens (single source of truth — KHÔNG hardcode màu/font)
+```
+
+## Đồng bộ đa thiết bị (sync-ready)
+DB dùng libSQL — local là `file:local.db`. Để đồng bộ máy↔điện thoại: tạo DB Turso, đổi `DATABASE_URL` + thêm `DATABASE_AUTH_TOKEN` trong `.env` (cùng engine, không phải viết lại — theo ADR-001).
+
+## Lộ trình
+MVP (Phase 1) hiện tại. Tiếp theo: Dạy học (P2) · Study OS (P3) · Habit/Rest (P4) · Cổng học viên (P5) · Thống kê (P6). Xem `.agents/specs/` + `.agents/context/product-vision.md`.

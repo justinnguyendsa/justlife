@@ -1,0 +1,147 @@
+/* ============================================================
+   Cổng học viên (/portal/*) — shell RIÊNG, KHÔNG dùng nav Personal.
+   CHỈ dùng token từ tokens.css (no hardcode màu/hex, no gradient).
+   Nhấn màu teal (--module-teach) cho khu dạy học.
+   ============================================================ */
+
+.portal { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); }
+
+/* ---- Header (top, mọi kích thước) ---- */
+.portal-top {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  height: 58px; padding: 0 var(--space-4);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.portal-brand { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-heading); font-weight: 800; font-size: 17px; color: var(--text-primary); }
+.portal-brand b { color: var(--module-teach); }
+.portal-brand .dot { width: 9px; height: 9px; border-radius: 3px; background: var(--module-teach); flex: none; }
+.portal-brand-tag { font-weight: 600; font-size: 13px; color: var(--text-secondary); }
+.portal-who { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.portal-name { font-size: 13px; font-weight: 600; color: var(--text-secondary); max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Nav top (desktop) ---- */
+.portal-nav { display: none; gap: var(--space-1); }
+.portal-nav a {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 9px var(--space-3); border-radius: var(--radius-sm);
+  font-weight: 600; font-size: 14px; color: var(--text-secondary);
+  min-height: 44px;
+}
+.portal-nav a:hover { background: var(--surface-2); }
+.portal-nav a.on { background: var(--teach-weak); color: var(--module-teach); }
+.portal-nav a svg { width: 19px; height: 19px; }
+
+/* ---- Nội dung ---- */
+.portal-main { flex: 1; width: 100%; max-width: var(--content-max); margin: 0 auto; padding: var(--space-4) var(--space-4) 92px; }
+
+/* ---- Bottom nav (mobile) ---- */
+.portal-bottom {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; height: 62px;
+  display: flex; background: var(--surface); border-top: 1px solid var(--border);
+}
+.portal-bottom a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  color: var(--text-faint); font-size: 10px; font-weight: 600; min-height: 44px;
+}
+.portal-bottom a.on { color: var(--module-teach); }
+.portal-bottom a svg { width: 21px; height: 21px; }
+
+/* ---- Nút đăng xuất ---- */
+.portal-logout {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary);
+  border-radius: var(--radius-sm); padding: 8px 12px; font-weight: 700; font-size: 13px; min-height: 40px;
+}
+.portal-logout:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.portal-logout svg { width: 16px; height: 16px; }
+
+/* ---- Trang đăng nhập (PUBLIC) ---- */
+.portal-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-5); background: var(--bg); }
+.portal-login-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); box-shadow: var(--shadow-md); }
+.portal-login-brand { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-heading); font-weight: 800; font-size: 20px; }
+.portal-login-brand b { color: var(--module-teach); }
+.portal-login-brand .dot { width: 11px; height: 11px; border-radius: 4px; background: var(--module-teach); }
+.portal-login h1 { font-size: 19px; font-weight: 800; margin-top: var(--space-4); }
+.portal-login .lead { color: var(--text-secondary); font-size: 13px; margin-top: var(--space-1); }
+.portal-login form { margin-top: var(--space-5); }
+.portal-login .hint { font-size: 12px; color: var(--text-faint); margin-top: var(--space-3); text-align: center; }
+.portal-login .hint .hint-ic { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
+.portal-err {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--danger-weak); color: var(--danger);
+  border-radius: var(--radius-sm); padding: 9px 11px; font-size: 12.5px; font-weight: 600; margin-bottom: var(--space-3);
+}
+.portal-err svg { width: 16px; height: 16px; flex: none; }
+
+/* ---- Lời chào dashboard ---- */
+.portal-hello { margin-bottom: var(--space-3); }
+.portal-hello h1 { font-size: 22px; font-weight: 800; }
+.portal-hello .sub { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+
+/* ---- Hàng dữ liệu (điểm / tài liệu) ---- */
+.portal-row { display: flex; gap: var(--space-3); align-items: flex-start; }
+.portal-row .grow { flex: 1; min-width: 0; }
+.portal-row .t { font-size: 14px; line-height: 1.35; font-weight: 600; }
+.portal-row .t.portal-strong { font-weight: 700; }
+.portal-row-ic { width: 20px; height: 20px; flex: none; color: var(--module-teach); margin-top: 1px; }
+.portal-bar { width: 4px; align-self: stretch; min-height: 28px; border-radius: 3px; flex: none; background: var(--module-teach); }
+.portal-score { font-family: var(--font-mono); font-weight: 800; font-size: 20px; color: var(--module-teach); white-space: nowrap; align-self: center; }
+.portal-score .portal-max { font-size: 12px; font-weight: 700; color: var(--text-faint); }
+.portal-score.none { color: var(--text-faint); font-size: 13px; font-family: var(--font-body); font-weight: 600; }
+.portal-fb { font-size: 13px; color: var(--text-secondary); line-height: 1.45; white-space: pre-wrap; margin: 0; }
+.portal-fb-box { display: flex; gap: 8px; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--border); }
+.portal-fb-ic { width: 16px; height: 16px; flex: none; color: var(--text-faint); margin-top: 2px; }
+.portal-sub { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+.portal-secdot-teach { background: var(--module-teach); }
+.portal-secdot-amber { background: var(--accent); }
+.portal-cta { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-6); }
+.portal-cta .btn { flex: 1; min-width: 150px; }
+.portal-soon { align-self: center; gap: 4px; }
+.portal-soon svg { width: 13px; height: 13px; }
+.portal-row .btn.sm { align-self: center; flex: none; }
+
+/* ---- Bài nộp (đã nộp + tải về) ---- */
+.portal-sub-done {
+  display: flex; gap: var(--space-2); align-items: center;
+  margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--border);
+}
+.portal-sub-done-ic { width: 18px; height: 18px; flex: none; color: var(--module-teach); }
+.portal-sub-label { font-size: 12px; font-weight: 700; color: var(--module-teach); }
+.portal-sub-file { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Ghi chú nhỏ (chính sách nộp) ---- */
+.portal-note {
+  display: flex; gap: 7px; align-items: flex-start;
+  margin-top: var(--space-4); font-size: 12px; color: var(--text-faint); line-height: 1.45;
+}
+.portal-note-ic { width: 14px; height: 14px; flex: none; margin-top: 1px; }
+
+/* ---- Skeleton (đang tải) ---- */
+.portal-skel-title { height: 26px; width: 60%; margin-bottom: 8px; }
+.portal-skel-line { height: 14px; width: 80%; }
+.portal-skel-sec { height: 14px; width: 120px; }
+.portal-skel-card { height: 44px; width: 100%; }
+
+/* ---- Error card ---- */
+.portal-errcard { text-align: center; padding: var(--space-6) var(--space-4); }
+.portal-errcard-ic { width: 28px; height: 28px; color: var(--danger); margin: 0 auto var(--space-2); }
+.portal-errcard h2 { font-size: 16px; font-weight: 800; }
+.portal-errcard p { font-size: 13px; color: var(--text-secondary); margin: 6px 0 var(--space-4); }
+.portal-errcard .btn { display: inline-flex; }
+
+/* ---- Cổng đồng ý (HV chưa thành niên chưa có đồng ý phụ huynh) ---- */
+.portal-consent-gate { text-align: center; padding: var(--space-6) var(--space-4); margin-top: var(--space-6); }
+.portal-consent-ic { width: 32px; height: 32px; color: var(--accent); margin: 0 auto var(--space-3); }
+.portal-consent-gate h1 { font-size: 18px; font-weight: 800; }
+.portal-consent-gate .sub { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: var(--space-2) 0 0; }
+.portal-consent-gate form { margin-top: var(--space-4); }
+.portal-consent-gate .btn { display: inline-flex; }
+
+/* ---- Bật nav top từ tablet trở lên ---- */
+@media (min-width: 768px) {
+  .portal-nav { display: flex; }
+  .portal-bottom { display: none; }
+  .portal-main { padding: var(--space-6) var(--space-6) var(--space-8); }
+  .portal-name { max-width: 220px; }
+}
