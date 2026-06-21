@@ -47,5 +47,8 @@ export async function GET(req: NextRequest) {
     sessionRole, // null = chưa có phiên | "guest" = email không khớp | "owner" = OK
     sessionIsStudent,
     authError,
+    // Lần thử đăng nhập Google gần nhất (in-memory; mở link này NGAY sau khi bị đá ra).
+    // match:false + attemptEmailDomain cho biết bạn đã bấm nhầm tài khoản nào.
+    lastSignin: (globalThis as Record<string, unknown>).__jlLastSignin ?? null,
   });
 }

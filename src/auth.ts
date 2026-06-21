@@ -65,17 +65,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Ưu tiên email đã verify từ profile Google; fallback user.email.
         const email = (profile?.email ?? user?.email)?.toLowerCase().trim();
         const verified = profile?.email_verified !== false; // Google trả true cho tài khoản hợp lệ
-        if (!owner || !email || email !== owner || !verified) {
-          // 🔎 Chẩn đoán (masked) → xem ở Vercel → Deployment → Runtime Logs.
-          //    KHÔNG in email đầy đủ; chỉ đủ để biết vì sao bị từ chối.
-          console.error("[owner-signin] REJECT", {
-            ownerEnvSet: Boolean(owner),
-            ownerEnvLen: owner?.length ?? 0, // email thật ~ 13 ký tự; nếu lớn bất thường = dính comment
-            emailSet: Boolean(email),
-            emailDomain: email?.split("@")[1] ?? null,
-            match: owner === email,
-            verified,
-          });
+        const ok = Boolean(owner && email && email === owner && verified);
+        // 🔎 Ghi lại lần thử gần nhất (in-memory) cho /api/debug-auth + log Vercel. KHÔNG lưu email đầy đủ.
+        const diag = {
+          ok,
+          match: owner === email,
+          attemptEmailDomain: email?.split("@")[1] ?? null, // domain tài khoản Google bạn vừa bấm
+          attemptEmailLen: email?.length ?? 0,
+          ownerEmailLen: owner?.length ?? 0,
+          verified,
+          at: new Date().toISOString(),
+        };
+        (globalThis as Record<string, unknown>).__jlLastSignin = diag;
+        if (!ok) {
+          console.error("[owner-signin] REJECT", diag);
           return false; // người lạ / email chưa verify → TỪ CHỐI
         }
         return true;
