@@ -54,23 +54,24 @@ export const authConfig = {
     // Gắn danh tính vào token KHI đăng nhập.
     //  - Học viên (access-code): id + cờ học viên, role "student" — KHÔNG lưu tên/email (chống lộ PII).
     //  - Chủ sở hữu (Google): role "owner" CHỈ khi email khớp OWNER_EMAIL (an toàn kép cùng signIn ở auth.ts).
-    jwt({ token, user, account }) {
+    jwt({ token, user }) {
       if (user) {
-        if (account?.provider === "google") {
-          // Chủ sở hữu: chỉ cấp role owner nếu email khớp OWNER_EMAIL (so khớp không phân biệt hoa/thường).
-          const owner = process.env.OWNER_EMAIL?.toLowerCase().trim();
-          const email = user.email?.toLowerCase().trim();
-          token.role = owner && email && email === owner ? "owner" : "guest";
-          // KHÔNG lưu studentId cho owner.
+        // Phân biệt bằng tín hiệu ĐÁNG TIN, KHÔNG dựa account.provider (Auth.js v5 beta có thể KHÔNG
+        // khớp "google" trên luồng OAuth → trước đây gán nhầm role="student" cho chủ sở hữu).
+        //  - Học viên: authorize() của access-code trả về studentId.
+        //  - Chủ sở hữu (Google): KHÔNG có studentId. signIn (auth.ts) đã CHẶN trước — chỉ cho qua khi
+        //    email === OWNER_EMAIL — nên user không-studentId tới được đây ⟹ chính là owner.
+        const u = user as { studentId?: string; lmsUserId?: string; isMinor?: boolean };
+        if (u.studentId) {
+          token.studentId = u.studentId;
+          token.lmsUserId = u.lmsUserId;
+          token.isMinor = u.isMinor;
+          token.role = "student";
+        } else {
+          token.role = "owner";
           token.studentId = undefined;
           token.lmsUserId = undefined;
           token.isMinor = undefined;
-        } else {
-          // Học viên (access-code) — giữ nguyên hành vi cũ.
-          token.studentId = user.studentId;
-          token.lmsUserId = user.lmsUserId;
-          token.isMinor = user.isMinor;
-          token.role = "student";
         }
       }
       return token;

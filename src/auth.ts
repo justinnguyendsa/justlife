@@ -59,31 +59,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     //    KHÔNG tạo phiên, KHÔNG vào được Personal/Dạy học. (Linking học viên-Google làm ở bước sau.)
     //  - access-code: giữ nguyên (authorize đã kiểm mã) → cho qua.
     async signIn({ account, profile, user }) {
-      if (account?.provider === "google") {
-        // .trim() phòng khi giá trị env dính khoảng trắng/xuống dòng khi dán vào dashboard.
-        const owner = process.env.OWNER_EMAIL?.toLowerCase().trim();
-        // Ưu tiên email đã verify từ profile Google; fallback user.email.
-        const email = (profile?.email ?? user?.email)?.toLowerCase().trim();
-        const verified = profile?.email_verified !== false; // Google trả true cho tài khoản hợp lệ
-        const ok = Boolean(owner && email && email === owner && verified);
-        // 🔎 Ghi lại lần thử gần nhất (in-memory) cho /api/debug-auth + log Vercel. KHÔNG lưu email đầy đủ.
-        const diag = {
-          ok,
-          match: owner === email,
-          attemptEmailDomain: email?.split("@")[1] ?? null, // domain tài khoản Google bạn vừa bấm
-          attemptEmailLen: email?.length ?? 0,
-          ownerEmailLen: owner?.length ?? 0,
-          verified,
-          at: new Date().toISOString(),
-        };
-        (globalThis as Record<string, unknown>).__jlLastSignin = diag;
-        if (!ok) {
-          console.error("[owner-signin] REJECT", diag);
-          return false; // người lạ / email chưa verify → TỪ CHỐI
-        }
-        return true;
+      // Học viên (access-code) mang studentId từ authorize() → đã xác thực, cho qua.
+      const u = user as { studentId?: string } | undefined;
+      if (u?.studentId) return true;
+      // Còn lại = đăng nhập CHỦ SỞ HỮU (Google). KHÔNG dựa account.provider (Auth.js v5 beta có thể
+      // không khớp "google" → fallback cũ "return true" vô tình cho MỌI tài khoản Google vào = lỗ hổng).
+      // CHỈ cho qua nếu email khớp OWNER_EMAIL + đã verify; người lạ → TỪ CHỐI.
+      const owner = process.env.OWNER_EMAIL?.toLowerCase().trim();
+      const email = (profile?.email ?? user?.email)?.toLowerCase().trim();
+      const verified = profile?.email_verified !== false; // Google trả true cho tài khoản hợp lệ
+      const ok = Boolean(owner && email && email === owner && verified);
+      // 🔎 Ghi lại lần thử gần nhất (in-memory) cho /api/debug-auth + log Vercel. KHÔNG lưu email đầy đủ.
+      const diag = {
+        ok,
+        match: owner === email,
+        attemptEmailDomain: email?.split("@")[1] ?? null,
+        attemptEmailLen: email?.length ?? 0,
+        ownerEmailLen: owner?.length ?? 0,
+        verified,
+        provider: account?.provider ?? null,
+        at: new Date().toISOString(),
+      };
+      (globalThis as Record<string, unknown>).__jlLastSignin = diag;
+      if (!ok) {
+        console.error("[owner-signin] REJECT", diag);
+        return false; // người lạ / email chưa verify → TỪ CHỐI
       }
-      return true; // access-code & các provider khác giữ nguyên
+      return true;
     },
   },
 });
