@@ -50,5 +50,14 @@ export async function GET(req: NextRequest) {
     // Lần thử đăng nhập Google gần nhất (in-memory; mở link này NGAY sau khi bị đá ra).
     // match:false + attemptEmailDomain cho biết bạn đã bấm nhầm tài khoản nào.
     lastSignin: (globalThis as Record<string, unknown>).__jlLastSignin ?? null,
+    // Đánh dấu bản deploy — xác nhận bạn đang chạy đúng bản mới nhất.
+    buildMarker: "diag-v3-cookies",
+    // Cookie phiên có tới được server không? (chỉ TÊN cookie, không có giá trị/secret)
+    cookieAuthRelated: req.cookies
+      .getAll()
+      .map((c) => c.name)
+      .filter((n) => /authjs|session-token/i.test(n)),
+    cookieSessionTokenPresent: req.cookies.getAll().some((c) => /session-token/i.test(c.name)),
+    cookieTotalCount: req.cookies.getAll().length,
   });
 }
