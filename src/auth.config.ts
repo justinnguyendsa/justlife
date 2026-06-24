@@ -14,6 +14,9 @@ import type { NextAuthConfig } from "next-auth";
 // Owner-auth BẬT khi có cấu hình Google + OWNER_EMAIL → tức môi trường cloud/production.
 // KHÔNG có cấu hình này (máy local của Minh) → coi như tắt → vào thẳng, DX cũ giữ nguyên.
 export function ownerAuthEnabledEnv(): boolean {
+  // DISABLE_OWNER_AUTH=1 → bypass tạm (dùng khi chưa có Google OAuth key).
+  // Xóa biến này trên Vercel để bật lại bảo vệ. KHÔNG commit giá trị =1 vào .env prod.
+  if (process.env.DISABLE_OWNER_AUTH) return false;
   return Boolean(process.env.AUTH_GOOGLE_ID && process.env.OWNER_EMAIL);
 }
 
