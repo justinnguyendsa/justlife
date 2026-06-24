@@ -88,3 +88,25 @@ export async function setGrade(input: { assignmentId: string; studentId: string;
   refreshClass(input.classId);
   return { ok: true };
 }
+
+// ===== Update / Delete helpers =====
+export async function updateAssignment(id: string, input: { title?: string; dueAt?: number | null; maxScore?: number }) {
+  await lmsDb.update(tcAssignment).set(input).where(eq(tcAssignment.id, id));
+  // classId không biết trực tiếp → revalidate rộng
+  revalidatePath("/teaching/classes", "layout");
+  return { ok: true };
+}
+
+export async function deleteSession(id: string, classId: string) {
+  await lmsDb.delete(tcAttendance).where(eq(tcAttendance.sessionId, id));
+  await lmsDb.delete(tcSession).where(eq(tcSession.id, id));
+  refreshClass(classId);
+  return { ok: true };
+}
+
+export async function deleteAssignment(id: string, classId: string) {
+  await lmsDb.delete(tcGrade).where(eq(tcGrade.assignmentId, id));
+  await lmsDb.delete(tcAssignment).where(eq(tcAssignment.id, id));
+  refreshClass(classId);
+  return { ok: true };
+}

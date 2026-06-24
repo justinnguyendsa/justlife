@@ -16,8 +16,8 @@ export type SubmissionRow = {
 };
 import {
   addStudent, removeStudent,
-  createSession, setAttendance,
-  createAssignment, setGrade,
+  createSession, setAttendance, deleteSession,
+  createAssignment, setGrade, deleteAssignment,
 } from "@/app/actions/teaching";
 import { provisionStudentAccess } from "@/app/actions/lms-admin";
 import { fmtDate, fmtTime } from "@/lib/format";
@@ -281,6 +281,15 @@ function AttendanceTab({ classId, students, sessions, attendanceBySession, pendi
   classId: string; students: TcStudent[]; sessions: TcSession[];
   attendanceBySession: Record<string, TcAttendance[]>; pending: boolean; start: Start; router: Router;
 }) {
+  function delSes(id: string) {
+    if (!confirm("Xóa buổi học này và toàn bộ điểm danh?")) return;
+    start(async () => {
+      await deleteSession(id, classId);
+      setSel(sessions.filter((s) => s.id !== id)[0]?.id ?? "");
+      router.refresh();
+      toast("Đã xóa buổi học");
+    });
+  }
   const [sel, setSel] = useState<string>(sessions[0]?.id ?? "");
   const [creating, setCreating] = useState(false);
   const [dateAt, setDateAt] = useState(defaultSessionDate());
@@ -339,13 +348,20 @@ function AttendanceTab({ classId, students, sessions, attendanceBySession, pendi
           {sessions.length === 0 ? (
             <div className="d">Chưa có buổi nào — tạo buổi mới bên dưới.</div>
           ) : (
-            <select value={sel} onChange={(e) => setSel(e.target.value)}>
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {fmtDate(s.dateAt)} {fmtTime(s.dateAt)}{s.topic ? ` · ${s.topic}` : ""}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <select style={{ flex: 1 }} value={sel} onChange={(e) => setSel(e.target.value)}>
+                {sessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {fmtDate(s.dateAt)} {fmtTime(s.dateAt)}{s.topic ? ` · ${s.topic}` : ""}
+                  </option>
+                ))}
+              </select>
+              {sel && (
+                <button className="btn line sm" disabled={pending} onClick={() => delSes(sel)} aria-label="Xóa buổi học">
+                  <Trash2 strokeWidth={1.9} />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -420,6 +436,15 @@ function GradingTab({ classId, students, assignments, gradesByAssignment, submis
   submissionsByAssignment: Record<string, SubmissionRow[]>;
   pending: boolean; start: Start; router: Router;
 }) {
+  function delAsg(id: string) {
+    if (!confirm("Xóa bài tập này và toàn bộ điểm đã chấm?")) return;
+    start(async () => {
+      await deleteAssignment(id, classId);
+      setSel(assignments.filter((a) => a.id !== id)[0]?.id ?? "");
+      router.refresh();
+      toast("Đã xóa bài tập");
+    });
+  }
   const [sel, setSel] = useState<string>(assignments[0]?.id ?? "");
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
@@ -503,11 +528,18 @@ function GradingTab({ classId, students, assignments, gradesByAssignment, submis
           {assignments.length === 0 ? (
             <div className="d">Chưa có bài tập nào — tạo bài mới bên dưới.</div>
           ) : (
-            <select value={sel} onChange={(e) => setSel(e.target.value)}>
-              {assignments.map((a) => (
-                <option key={a.id} value={a.id}>{a.title} · thang {a.maxScore}</option>
-              ))}
-            </select>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <select style={{ flex: 1 }} value={sel} onChange={(e) => setSel(e.target.value)}>
+                {assignments.map((a) => (
+                  <option key={a.id} value={a.id}>{a.title} · thang {a.maxScore}</option>
+                ))}
+              </select>
+              {sel && (
+                <button className="btn line sm" disabled={pending} onClick={() => delAsg(sel)} aria-label="Xóa bài tập">
+                  <Trash2 strokeWidth={1.9} />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
