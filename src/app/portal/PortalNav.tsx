@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, GraduationCap, FolderOpen, ClipboardList } from "lucide-react";
+import { Home, GraduationCap, FolderOpen, ClipboardList, User } from "lucide-react";
 
 // Điều hướng cổng học viên (đơn giản): Trang chủ / Bài tập / Điểm / Tài liệu.
 // Highlight mục đang mở. Dùng 2 lần: thanh trên (desktop) + thanh dưới (mobile).
@@ -13,6 +13,7 @@ const ITEMS = [
   { href: "/portal/assignments", label: "Bài tập", Icon: ClipboardList },
   { href: "/portal/grades", label: "Điểm", Icon: GraduationCap },
   { href: "/portal/materials", label: "Tài liệu", Icon: FolderOpen },
+  { href: "/portal/profile", label: "Hồ sơ", Icon: User },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {

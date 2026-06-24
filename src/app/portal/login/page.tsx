@@ -8,11 +8,15 @@ export const metadata: Metadata = {
 };
 
 // PUBLIC — middleware cho phép. Đã đăng nhập rồi thì vào thẳng cổng (tránh ở lại trang login).
-// Form nhập MÃ TRUY CẬP; nút Google ẩn ở P5a (Google chờ go-live P5b).
+// Form nhập MÃ TRUY CẬP + nút Gmail (hiện khi có AUTH_GOOGLE_ID + AUTH_GOOGLE_SECRET).
 
 export default async function PortalLoginPage() {
   const studentId = await getSessionStudentId();
   if (studentId) redirect("/portal");
+
+  const googleEnabled = Boolean(
+    process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
+  );
 
   return (
     <div className="portal-login">
@@ -24,7 +28,7 @@ export default async function PortalLoginPage() {
         <h1>Cổng học viên</h1>
         <p className="lead">Đăng nhập để xem điểm và tài liệu lớp của bạn.</p>
 
-        <LoginForm />
+        <LoginForm googleEnabled={googleEnabled} />
       </div>
     </div>
   );

@@ -203,3 +203,11 @@
   .portal-main { padding: var(--space-6) var(--space-6) var(--space-8); }
   .portal-name { max-width: 220px; }
 }
+
+/* ---- portal-err biến thể ok (liên kết thành công) ---- */
+.portal-err.ok { background: var(--ok-soft, #f0fdf4); border-color: var(--ok, #16a34a); color: var(--ok, #15803d); }
+.portal-err { border: 1px solid transparent; }
+
+/* ---- Divider "hoặc" (phân cách form mã / nút Gmail) ---- */
+.portal-or { display: flex; align-items: center; gap: 8px; margin: 14px 0; color: var(--text-faint); font-size: 12px; }
+.portal-or::before, .portal-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }

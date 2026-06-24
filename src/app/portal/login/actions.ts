@@ -30,3 +30,8 @@ export async function loginWithCode(
     throw err;
   }
 }
+
+/** Đăng nhập bằng Google OAuth (redirect sang Google, sau đó Auth.js xử lý callback). */
+export async function loginWithGoogle() {
+  await signIn("google", { redirectTo: "/portal" });
+}

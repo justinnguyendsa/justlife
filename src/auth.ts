@@ -37,10 +37,10 @@ const accessCodeProvider = Credentials({
   },
 });
 
-// Provider chủ sở hữu (Google) — CHỈ nạp khi cloud (có Google env + OWNER_EMAIL).
-// Local dev không có env này → mảng provider không có Google → app mở như cũ, không yêu cầu đăng nhập.
+// Provider học viên + chủ sở hữu — Google bật khi có key (không phụ thuộc OWNER_EMAIL vì học viên cũng cần).
+// signIn callback dưới đây kiểm soát quyền vào thực sự (owner và học viên liên kết đều được). 
 const providers: Provider[] = [accessCodeProvider];
-if (ownerAuthEnabledEnv()) {
+if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
   providers.push(
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
@@ -82,8 +82,43 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       };
       (globalThis as Record<string, unknown>).__jlLastSignin = diag;
       if (!ok) {
+        // Học viên đăng nhập bằng Gmail (sau khi đã liên kết bằng linkGoogleEmail).
+        // Bất biến bảo mật:
+        //  - Chỉ lookup bằng emailIndex (blind-index, không giải mã email thô).
+        //  - Chỉ cho vào nếu status === 'active' và có studentId.
+        //  - Nếu không tìm thấy → tiếp tục return false (từ chối).
+        if (email && verified) {
+          try {
+            const { blindIndex } = await import("@/lib/lms/crypto");
+            const { lmsDb } = await import("@/db/lms/client");
+            const { lmsUser: lmsUserTable } = await import("@/db/lms/schema");
+            const { eq } = await import("drizzle-orm");
+            const emailIdx = blindIndex(email);
+            const found = await lmsDb
+              .select({
+                id: lmsUserTable.id,
+                studentId: lmsUserTable.studentId,
+                isMinor: lmsUserTable.isMinor,
+                status: lmsUserTable.status,
+              })
+              .from(lmsUserTable)
+              .where(eq(lmsUserTable.emailIndex, emailIdx))
+              .limit(1);
+            if (found[0] && found[0].status === "active" && found[0].studentId) {
+              // Gắn thông tin học viên vào user object để jwt callback xử lý.
+              const u = user as Record<string, unknown>;
+              u.studentId = found[0].studentId;
+              u.lmsUserId = found[0].id;
+              u.isMinor = found[0].isMinor === 1;
+              console.log("[student-gmail-signin] OK, studentId:", found[0].studentId);
+              return true;
+            }
+          } catch (e) {
+            console.error("[student-gmail-signin] error", e);
+          }
+        }
         console.error("[owner-signin] REJECT", diag);
-        return false; // người lạ / email chưa verify → TỪ CHỐI
+        return false; // người lạ / email chưa verify / học viên chưa liên kết → TỪ CHỐI
       }
       return true;
     },

@@ -1,6 +1,7 @@
 import { and, eq, inArray, gte } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import {
+  lmsUser,
   tcAssignment,
   tcAttendance,
   tcClass,
@@ -406,4 +407,80 @@ export async function getMyLearningSummary(studentId: string) {
     totalSessions,
     attendanceRate,
   };
+}
+
+// ===== Profile (Feature P6 - trang hồ sơ học viên) =====
+
+/**
+ * Hồ sơ đầy đủ: thông tin cá nhân + Gmail đã liên kết hay chưa.
+ * Trả null nếu không tìm thấy studentId trong DB.
+ */
+export async function getMyProfile(studentId: string) {
+  // Thông tin học viên (giải mã an toàn)
+  const stuRows = await lmsDb
+    .select({ id: tcStudent.id, name: tcStudent.name, classId: tcStudent.classId })
+    .from(tcStudent)
+    .where(eq(tcStudent.id, studentId))
+    .limit(1);
+  const stu = stuRows[0] ?? null;
+  if (!stu) return null;
+
+  // Lớp học
+  const classes = await getMyClasses(studentId);
+
+  // Gmail đã liên kết?
+  const lmsRows = await lmsDb
+    .select({ email: lmsUser.email, emailIndex: lmsUser.emailIndex })
+    .from(lmsUser)
+    .where(eq(lmsUser.studentId, studentId))
+    .limit(1);
+  const lmsU = lmsRows[0] ?? null;
+  const gmailLinked = Boolean(lmsU?.emailIndex);
+  const gmailEmail = lmsU?.email ? safeDecrypt(lmsU.email) : null;
+
+  return {
+    name: safeDecrypt(stu.name) ?? stu.name,
+    studentId,
+    classes,
+    gmailLinked,
+    gmailEmail,
+  };
+}
+
+/**
+ * Lưu Gmail liên kết (mã hóa + blind-index).
+ * Bất biến bảo mật: kiểm tra trùng bằng emailIndex, không giải mã toàn bộ.
+ */
+export async function linkGoogleEmail(
+  studentId: string,
+  gmail: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const normalized = gmail.trim().toLowerCase();
+  if (!normalized.includes("@")) return { ok: false, error: "Email không hợp lệ." };
+
+  try {
+    // Import crypto (Node runtime only — portal-queries chạy server-side)
+    const { encryptFieldOpt, blindIndex } = await import("@/lib/lms/crypto");
+    const emailCipher = encryptFieldOpt(normalized);
+    const emailIdx = blindIndex(normalized);
+
+    // Kiểm tra email đã liên kết với tài khoản khác chưa (chống trùng)
+    const existing = await lmsDb
+      .select({ id: lmsUser.id, studentId: lmsUser.studentId })
+      .from(lmsUser)
+      .where(eq(lmsUser.emailIndex, emailIdx!))
+      .limit(1);
+    if (existing[0] && existing[0].studentId !== studentId) {
+      return { ok: false, error: "Gmail này đã được liên kết với tài khoản khác." };
+    }
+
+    await lmsDb
+      .update(lmsUser)
+      .set({ email: emailCipher, emailIndex: emailIdx })
+      .where(eq(lmsUser.studentId, studentId));
+    return { ok: true };
+  } catch (e) {
+    console.error("[linkGoogleEmail]", e);
+    return { ok: false, error: "Không thể lưu. Vui lòng thử lại." };
+  }
 }
