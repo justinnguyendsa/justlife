@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { getClassDetail, getAttendance, getGrades, getSubmissions } from "@/db/teaching";
+import { getClassDetail, getAttendance, getGrades, getSubmissions, getClassSummary, getAssignmentSubmissionStats, getStudentProgressInClass } from "@/db/teaching";
 import { getFilesForClass } from "@/db/library";
 import type { TcAttendance, TcGrade } from "@/db/lms/schema";
 import { PageHeader } from "@/components/PageHeader";
@@ -32,6 +32,15 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
 
   const files = await getFilesForClass(id);
 
+  const summary = await getClassSummary(id);
+
+  const submissionStats: Record<string, { totalStudents: number; submittedCount: number; pendingGradeCount: number }> = {};
+  for (const a of detail.assignments) {
+    submissionStats[a.id] = await getAssignmentSubmissionStats(a.id, id);
+  }
+
+  const studentProgress = await getStudentProgressInClass(id);
+
   return (
     <>
       <Link href="/teaching/classes" className="btn line sm" style={{ marginBottom: 10 }}>
@@ -43,6 +52,9 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
         attendanceBySession={attendanceBySession}
         gradesByAssignment={gradesByAssignment}
         submissionsByAssignment={submissionsByAssignment}
+        summary={summary}
+        submissionStats={submissionStats}
+        studentProgress={studentProgress}
       />
       <LinkedFiles files={files} />
     </>

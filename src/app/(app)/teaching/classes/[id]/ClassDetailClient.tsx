@@ -24,11 +24,17 @@ import { fmtDate, fmtTime } from "@/lib/format";
 import { toast } from "@/components/Toaster";
 
 type Detail = { cls: TcClass; students: TcStudent[]; sessions: TcSession[]; assignments: TcAssignment[] };
+type Summary = { studentCount: number; assignmentCount: number; avgSubmissionPct: number; avgScore: number | null };
+type SubmissionStat = { totalStudents: number; submittedCount: number; pendingGradeCount: number };
+type StudentProgress = { submitted: number; total: number; avgScore: number | null };
 type Props = {
   detail: Detail;
   attendanceBySession: Record<string, TcAttendance[]>;
   gradesByAssignment: Record<string, TcGrade[]>;
   submissionsByAssignment: Record<string, SubmissionRow[]>;
+  summary: Summary;
+  submissionStats: Record<string, SubmissionStat>;
+  studentProgress: Record<string, StudentProgress>;
 };
 
 type Tab = "students" | "attendance" | "grading";
@@ -53,7 +59,7 @@ function defaultSessionDate(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignment, submissionsByAssignment }: Props) {
+export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignment, submissionsByAssignment, summary, submissionStats, studentProgress }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [tab, setTab] = useState<Tab>("students");
@@ -61,6 +67,24 @@ export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignm
 
   return (
     <>
+      <div className="class-summary">
+        <div className="class-summary-item">
+          <span className="class-summary-n">{summary.studentCount}</span>
+          <span className="class-summary-l">Học viên</span>
+        </div>
+        <div className="class-summary-item">
+          <span className="class-summary-n">{summary.assignmentCount}</span>
+          <span className="class-summary-l">Bài tập</span>
+        </div>
+        <div className="class-summary-item">
+          <span className="class-summary-n">{summary.avgSubmissionPct}%</span>
+          <span className="class-summary-l">Nộp TB</span>
+        </div>
+        <div className="class-summary-item">
+          <span className="class-summary-n">{summary.avgScore ?? '—'}</span>
+          <span className="class-summary-l">Điểm TB</span>
+        </div>
+      </div>
       <div className="tabs" role="tablist">
         <button role="tab" className={tab === "students" ? "on" : ""} onClick={() => setTab("students")}>Học viên</button>
         <button role="tab" className={tab === "attendance" ? "on" : ""} onClick={() => setTab("attendance")}>Điểm danh</button>
@@ -68,7 +92,7 @@ export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignm
       </div>
 
       {tab === "students" && (
-        <StudentsTab classId={detail.cls.id} students={students} pending={pending} start={start} router={router} />
+        <StudentsTab classId={detail.cls.id} students={students} pending={pending} start={start} router={router} studentProgress={studentProgress} />
       )}
       {tab === "attendance" && (
         <AttendanceTab
@@ -88,6 +112,7 @@ export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignm
           assignments={assignments}
           gradesByAssignment={gradesByAssignment}
           submissionsByAssignment={submissionsByAssignment}
+          submissionStats={submissionStats}
           pending={pending}
           start={start}
           router={router}
@@ -101,8 +126,9 @@ export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignm
 type Router = ReturnType<typeof useRouter>;
 type Start = ReturnType<typeof useTransition>[1];
 
-function StudentsTab({ classId, students, pending, start, router }: {
+function StudentsTab({ classId, students, pending, start, router, studentProgress }: {
   classId: string; students: TcStudent[]; pending: boolean; start: Start; router: Router;
+  studentProgress: Record<string, StudentProgress>;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -152,6 +178,14 @@ function StudentsTab({ classId, students, pending, start, router }: {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div className="l">{s.name}</div>
                 {s.email && <div className="d" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{s.email}</div>}
+                {studentProgress[s.id] && (
+                  <div className="stu-prog">
+                    <span className="stu-prog-n">{studentProgress[s.id].submitted}/{studentProgress[s.id].total} bài</span>
+                    {studentProgress[s.id].avgScore != null && (
+                      <span className="stu-prog-score">ĐTB: {studentProgress[s.id].avgScore}</span>
+                    )}
+                  </div>
+                )}
               </div>
               <button className="btn line sm" disabled={pending} onClick={() => setProvSid(s.id)} aria-label={`Cấp mã truy cập cho ${s.name}`} title="Cấp mã truy cập">
                 <KeyRound strokeWidth={1.9} />
@@ -430,10 +464,11 @@ function AttendanceTab({ classId, students, sessions, attendanceBySession, pendi
 }
 
 /* ============ TAB: CHẤM BÀI ============ */
-function GradingTab({ classId, students, assignments, gradesByAssignment, submissionsByAssignment, pending, start, router }: {
+function GradingTab({ classId, students, assignments, gradesByAssignment, submissionsByAssignment, submissionStats, pending, start, router }: {
   classId: string; students: TcStudent[]; assignments: TcAssignment[];
   gradesByAssignment: Record<string, TcGrade[]>;
   submissionsByAssignment: Record<string, SubmissionRow[]>;
+  submissionStats: Record<string, SubmissionStat>;
   pending: boolean; start: Start; router: Router;
 }) {
   function delAsg(id: string) {
@@ -574,6 +609,22 @@ function GradingTab({ classId, students, assignments, gradesByAssignment, submis
           <div className="empty">Chưa có học viên — thêm ở tab “Học viên” trước khi chấm bài.</div>
         ) : (
           <>
+            {submissionStats[assignment.id] && submissionStats[assignment.id].totalStudents > 0 && (
+              <div className="assign-stats">
+                <div className="assign-stats-bar-wrap">
+                  <div
+                    className="assign-stats-bar"
+                    style={{ width: `${Math.round((submissionStats[assignment.id].submittedCount / submissionStats[assignment.id].totalStudents) * 100)}%` }}
+                  />
+                </div>
+                <div className="assign-stats-label">
+                  {submissionStats[assignment.id].submittedCount}/{submissionStats[assignment.id].totalStudents} học viên đã nộp
+                  {submissionStats[assignment.id].pendingGradeCount > 0 && (
+                    <span className="chip warn" style={{ marginLeft: 8 }}>{submissionStats[assignment.id].pendingGradeCount} chờ chấm</span>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="sec">
               <h2><span className="secdot" style={{ background: "var(--module-teach)" }} /><FileText strokeWidth={1.8} style={{ width: 15, height: 15 }} />Bảng điểm</h2>
               <span className="cnt">{gradedCount}/{students.length} đã chấm</span>

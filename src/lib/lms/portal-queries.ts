@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, gte } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import {
   tcAssignment,
@@ -232,4 +232,178 @@ export async function assertOwnsSubmission(studentId: string, fileRef: string) {
     throw new Error("FORBIDDEN: không có quyền với bài nộp này.");
   }
   return { ...sub, originalName: safeDecrypt(sub.originalName) };
+}
+
+// ===== ST-1: Tiến độ nộp bài theo lớp =====
+
+/** Tiến độ nộp bài của TÔI theo từng lớp (số bài đã nộp / tổng, %). */
+export async function getMyClassProgress(studentId: string) {
+  const classIds = await myClassIds(studentId);
+  if (classIds.length === 0) return [];
+
+  return Promise.all(
+    classIds.map(async (classId) => {
+      const [cls] = await lmsDb
+        .select({ id: tcClass.id, name: tcClass.name, term: tcClass.term })
+        .from(tcClass)
+        .where(eq(tcClass.id, classId))
+        .limit(1);
+
+      const assignments = await lmsDb
+        .select({ id: tcAssignment.id })
+        .from(tcAssignment)
+        .where(eq(tcAssignment.classId, classId));
+
+      const totalCount = assignments.length;
+      if (totalCount === 0) {
+        return {
+          classId,
+          className: cls?.name ?? "",
+          term: cls?.term ?? null,
+          submitted: 0,
+          total: 0,
+          pct: 0,
+        };
+      }
+
+      const assignmentIds = assignments.map((a) => a.id);
+      const subs = await lmsDb
+        .select({ assignmentId: tcSubmission.assignmentId })
+        .from(tcSubmission)
+        .where(
+          and(
+            eq(tcSubmission.studentId, studentId),
+            inArray(tcSubmission.assignmentId, assignmentIds),
+          ),
+        );
+
+      const uniqueSubmitted = new Set(subs.map((s) => s.assignmentId)).size;
+      return {
+        classId,
+        className: cls?.name ?? "",
+        term: cls?.term ?? null,
+        submitted: uniqueSubmitted,
+        total: totalCount,
+        pct: Math.round((uniqueSubmitted / totalCount) * 100),
+      };
+    }),
+  );
+}
+
+// ===== ST-2: Activity dates (streak calendar) =====
+
+/** Ngày có hoạt động (nộp bài) trong N ngày gần nhất. Dùng cho streak calendar. */
+export async function getMyActivityDates(
+  studentId: string,
+  sinceDays = 28,
+): Promise<string[]> {
+  const since = Date.now() - sinceDays * 86_400_000;
+  const subs = await lmsDb
+    .select({ submittedAt: tcSubmission.submittedAt })
+    .from(tcSubmission)
+    .where(
+      and(
+        eq(tcSubmission.studentId, studentId),
+        gte(tcSubmission.submittedAt, since),
+      ),
+    );
+
+  // dateKey YYYY-MM-DD (Asia/Ho_Chi_Minh)
+  const keys = new Set<string>();
+  for (const s of subs) {
+    if (!s.submittedAt) continue;
+    const d = new Date(s.submittedAt);
+    const key = d.toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
+    keys.add(key);
+  }
+  return [...keys];
+}
+
+// ===== ST-3: Stats 28 ngày =====
+
+/** Thống kê 28 ngày qua của học viên. */
+export async function getMyStats28d(studentId: string) {
+  const since = Date.now() - 28 * 86_400_000;
+
+  // Bài đã nộp trong 28 ngày
+  const subs = await lmsDb
+    .select({ id: tcSubmission.id })
+    .from(tcSubmission)
+    .where(
+      and(
+        eq(tcSubmission.studentId, studentId),
+        gte(tcSubmission.submittedAt, since),
+      ),
+    );
+
+  // Điểm trung bình (tất cả, đã chấm)
+  const grades = await lmsDb
+    .select({ score: tcGrade.score })
+    .from(tcGrade)
+    .where(eq(tcGrade.studentId, studentId));
+
+  const scored = grades.filter((g) => g.score != null);
+  const avgScore =
+    scored.length > 0
+      ? Math.round(
+          (scored.reduce((s, g) => s + (g.score ?? 0), 0) / scored.length) *
+            10,
+        ) / 10
+      : null;
+
+  // Buổi có mặt trong 28 ngày (join session để lọc theo dateAt)
+  const att = await lmsDb
+    .select({ id: tcAttendance.id })
+    .from(tcAttendance)
+    .innerJoin(tcSession, eq(tcAttendance.sessionId, tcSession.id))
+    .where(
+      and(
+        eq(tcAttendance.studentId, studentId),
+        inArray(tcAttendance.status, ["present", "late"]),
+        gte(tcSession.dateAt, since),
+      ),
+    );
+
+  return { submittedCount: subs.length, avgScore, attendedCount: att.length };
+}
+
+// ===== ST-4: Learning summary =====
+
+/** Tóm tắt học tập: tỉ lệ có mặt, điểm TB, bài đã nộp. */
+export async function getMyLearningSummary(studentId: string) {
+  const [assignmentsWithSub, grades, attendance] = await Promise.all([
+    getMyAssignmentsWithSubmission(studentId),
+    getMyGrades(studentId),
+    getMyAttendance(studentId),
+  ]);
+
+  const totalAssignments = assignmentsWithSub.length;
+  const submitted = assignmentsWithSub.filter((a) => a.submission !== null).length;
+
+  const scored = grades.filter((g) => g.score != null);
+  const avgScore =
+    scored.length > 0
+      ? Math.round(
+          (scored.reduce((s, g) => s + (g.score ?? 0), 0) / scored.length) *
+            10,
+        ) / 10
+      : null;
+
+  const presentCount = attendance.filter(
+    (a) => a.status === "present" || a.status === "late",
+  ).length;
+  const totalSessions = attendance.length;
+  const attendanceRate =
+    totalSessions > 0
+      ? Math.round((presentCount / totalSessions) * 100)
+      : null;
+
+  return {
+    totalAssignments,
+    submitted,
+    avgScore,
+    presentCount,
+    totalSessions,
+    attendanceRate,
+  };
 }

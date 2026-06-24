@@ -138,6 +138,64 @@
 .portal-consent-gate form { margin-top: var(--space-4); }
 .portal-consent-gate .btn { display: inline-flex; }
 
+/* ---- ST-1: Bài tiếp theo ---- */
+.portal-nextup { background: var(--module-teach); color: #fff; border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4); }
+.portal-nextup-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .85; margin-bottom: var(--space-1); }
+.portal-nextup-title { font-size: 18px; font-weight: 800; line-height: 1.3; }
+.portal-nextup-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
+.portal-nextup .chip { background: rgba(255,255,255,.22); color: #fff; border-color: transparent; }
+.portal-nextup .btn.primary { background: #fff; color: var(--module-teach); margin-top: var(--space-3); }
+
+/* ---- ST-1: Progress bar per class ---- */
+.portal-progress-wrap { height: 6px; background: var(--border); border-radius: 999px; margin-top: var(--space-2); overflow: hidden; }
+.portal-progress-bar { height: 100%; background: var(--module-teach); border-radius: 999px; transition: width .4s ease; }
+.portal-progress-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+/* ---- ST-2/3: Widgets grid ---- */
+.portal-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4); }
+.portal-widget { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-4); }
+.portal-widget-title { font-size: 13px; font-weight: 700; margin-bottom: var(--space-3); }
+
+/* ST-2: Streak calendar */
+.portal-week { display: flex; gap: 6px; }
+.portal-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.portal-day span { font-size: 10px; color: var(--text-secondary); }
+.portal-day::before { content: ''; display: block; width: 28px; height: 28px; border-radius: 50%; background: var(--border); }
+.portal-day.active::before { background: var(--module-teach); }
+.portal-day.today > span { color: var(--module-teach); font-weight: 700; }
+
+/* ST-3: Stats row */
+.portal-stats { display: flex; }
+.portal-stat { flex: 1; text-align: center; padding: var(--space-2) 0; border-right: 1px solid var(--border); }
+.portal-stat:last-child { border-right: none; }
+.portal-stat-n { font-size: 22px; font-weight: 800; color: var(--text-primary); }
+.portal-stat-l { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ---- ST-4: Tabs ---- */
+.tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px; margin-bottom: var(--space-4); overflow-x: auto; }
+.tabs a { flex: 1; display: inline-flex; align-items: center; justify-content: center; padding: 8px var(--space-3); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; min-height: 36px; }
+.tabs a:hover { background: var(--surface-2); }
+.tabs a.on { background: var(--module-teach); color: #fff; }
+
+/* ST-4: Attendance status chips */
+.chip.ok { background: var(--success-weak, #d1fae5); color: var(--success, #047857); }
+.chip.warn { background: var(--warn-weak, #fef3c7); color: var(--warn, #b45309); }
+.chip.err { background: var(--danger-weak); color: var(--danger); }
+
+/* ST-4: Summary grid (4 big stats) */
+.portal-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4); }
+.portal-summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; }
+.portal-summary-n { font-size: 32px; font-weight: 800; color: var(--module-teach); line-height: 1; }
+.portal-summary-l { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-top: var(--space-2); }
+.portal-summary-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+/* ---- Responsive ---- */
+@media (max-width: 480px) {
+  .portal-widgets { grid-template-columns: 1fr; }
+  .portal-summary-grid { grid-template-columns: 1fr 1fr; }
+  .portal-day::before { width: 22px; height: 22px; }
+}
+
 /* ---- Bật nav top từ tablet trở lên ---- */
 @media (min-width: 768px) {
   .portal-nav { display: flex; }
