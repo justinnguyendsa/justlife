@@ -1,38 +1,33 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, CalendarDays, LayoutGrid } from "lucide-react";
 import type { FixedSchedule, TimeBlock, Task } from "@/db/schema";
-import { createTimeBlock, updateTimeBlock } from "@/app/actions/schedule";
-import { maskHasDate, fixedToRange, detectConflicts } from "@/lib/scheduler";
-import { fmtTime } from "@/lib/format";
-import { AREA_VAR, AREAS } from "@/lib/areas";
+import { createTimeBlock } from "@/app/actions/schedule";
+import type { Conflict } from "@/lib/scheduler";
+import { fmtTime, fmtDate } from "@/lib/format";
+import { AREAS } from "@/lib/areas";
 import { toast } from "@/components/Toaster";
+import { CalendarDragDrop } from "@/components/CalendarDragDrop";
+import { CalendarWeekView, getWeekDays } from "@/components/CalendarWeekView";
 
-// Lưới giờ hiển thị 07:00–23:00 — mỗi giờ cao 46px (khớp CSS `.cal .hour`).
+// ─── Helper: lấy thứ Hai đầu tuần chứa `ms` (local time) ───────────────────
+export function getMonday(ms: number): number {
+  const d = new Date(ms);
+  const day = d.getDay(); // 0=CN
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+const DAY_MS = 86_400_000;
 const START_HOUR = 7;
 const END_HOUR = 23;
-const HOUR_PX = 46;
 const HOUR_MS = 3_600_000;
-const SNAP_MIN = 15; // snap kéo-thả về bội số 15 phút
-const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
-const GRID_PX = HOURS.length * HOUR_PX; // chiều cao vùng kéo-thả
-const MIN_BLOCK_PX = 16; // chiều cao tối thiểu để chip vẫn đọc được
-
-type Range = { startAt: number; endAt: number };
-
-// Quy đổi vị trí dọc (px tính từ đỉnh lưới) ↔ mốc thời gian trong ngày.
-function topPxOf(ms: number, day0: number): number {
-  return ((ms - day0) / HOUR_MS - START_HOUR) * HOUR_PX;
-}
-function startAtFromTop(topPx: number, day0: number): number {
-  const rawMin = (START_HOUR + topPx / HOUR_PX) * 60;
-  const snapped = Math.round(rawMin / SNAP_MIN) * SNAP_MIN;
-  return day0 + snapped * 60_000;
-}
 
 export function CalendarClient({
-  day0,
+  day0: initialDay0,
   fixed,
   blocks,
   tasks,
@@ -45,24 +40,61 @@ export function CalendarClient({
   const router = useRouter();
   const [pending, start] = useTransition();
 
-  // Khối cố định áp dụng cho NGÀY đang xem (lọc theo weekdayMask), quy đổi sang khoảng epoch.
-  const dayDate = useMemo(() => new Date(day0), [day0]);
-  const fixedRanges = useMemo(
-    () =>
-      fixed
-        .filter((f) => maskHasDate(f.weekdayMask, dayDate))
-        .map((f) => ({ id: f.id, label: f.label, area: f.area, ...fixedToRange(f, day0) })),
-    [fixed, dayDate, day0]
-  );
+  // ─── View mode toggle ─────────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<"day" | "week">("day");
+  const [day0, setDay0] = useState(initialDay0);
+  const [weekStart, setWeekStart] = useState(() => getMonday(initialDay0));
 
-  // --- Trạng thái kéo-thả (Pointer Events: hỗ trợ cả chuột & chạm) ---
-  const gridRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ id: string; pointerY0: number; top0: number; height: number } | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragTop, setDragTop] = useState(0); // vị trí top hiện tại khi đang kéo
-  const [dragConflict, setDragConflict] = useState(false);
+  // Khi chuyển sang tuần, đảm bảo weekStart luôn đồng bộ với ngày hiện tại
+  function switchToWeek() {
+    setWeekStart(getMonday(day0));
+    setViewMode("week");
+    // Cần load blocks của cả tuần — trigger router refresh với param weekStart
+    const ws = getMonday(day0);
+    router.push(`/calendar?weekStart=${ws}`);
+  }
 
-  // --- Sheet "Thêm khối" ---
+  function switchToDay(d?: number) {
+    const target = d ?? day0;
+    setDay0(target);
+    setViewMode("day");
+    router.push(`/calendar?day=${target}`);
+  }
+
+  // ─── Điều hướng ngày/tuần ─────────────────────────────────────────────────
+  function prevDay() {
+    const next = day0 - DAY_MS;
+    setDay0(next);
+    router.push(`/calendar?day=${next}`);
+  }
+  function nextDay() {
+    const next = day0 + DAY_MS;
+    setDay0(next);
+    router.push(`/calendar?day=${next}`);
+  }
+  function todayDay() {
+    const t0 = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+    setDay0(t0);
+    router.push(`/calendar?day=${t0}`);
+  }
+
+  function prevWeek() {
+    const ws = weekStart - 7 * DAY_MS;
+    setWeekStart(ws);
+    router.push(`/calendar?weekStart=${ws}`);
+  }
+  function nextWeek() {
+    const ws = weekStart + 7 * DAY_MS;
+    setWeekStart(ws);
+    router.push(`/calendar?weekStart=${ws}`);
+  }
+  function todayWeek() {
+    const ws = getMonday(Date.now());
+    setWeekStart(ws);
+    router.push(`/calendar?weekStart=${ws}`);
+  }
+
+  // ─── Sheet "Thêm khối" ───────────────────────────────────────────────────
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selTaskId, setSelTaskId] = useState<string | "">("");
   const [freeTitle, setFreeTitle] = useState("");
@@ -70,7 +102,6 @@ export function CalendarClient({
   const [startHHMM, setStartHHMM] = useState("09:00");
   const [durMin, setDurMin] = useState(60);
 
-  // Đóng sheet bằng phím Esc (desktop).
   useEffect(() => {
     if (!sheetOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -80,87 +111,24 @@ export function CalendarClient({
     return () => window.removeEventListener("keydown", onKey);
   }, [sheetOpen]);
 
-  // Kéo block đè khối khác/cố định → tính realtime để tô đỏ (.conflict).
-  function computeConflict(id: string, range: Range): boolean {
-    const others = blocks.filter((b) => b.id !== id).map((b) => ({ ...b }));
-    return detectConflicts(range.startAt, range.endAt, fixed, others, id).length > 0;
-  }
-
-  function onBlockPointerDown(e: React.PointerEvent, b: TimeBlock) {
-    // Chỉ kéo bằng nút trái chuột hoặc chạm/bút.
-    if (e.button !== 0) return;
-    e.preventDefault();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    const top0 = topPxOf(b.startAt, day0);
-    const height = (b.endAt - b.startAt) / HOUR_MS * HOUR_PX;
-    drag.current = { id: b.id, pointerY0: e.clientY, top0, height };
-    setDragId(b.id);
-    setDragTop(top0);
-    setDragConflict(false);
-  }
-
-  function onBlockPointerMove(e: React.PointerEvent) {
-    const d = drag.current;
-    if (!d) return;
-    const delta = e.clientY - d.pointerY0;
-    // Clamp để block luôn nằm trọn trong lưới 07:00–24:00.
-    const maxTop = GRID_PX - d.height;
-    const nextTop = Math.max(0, Math.min(maxTop, d.top0 + delta));
-    setDragTop(nextTop);
-    const newStart = startAtFromTop(nextTop, day0);
-    const newEnd = newStart + (d.height / HOUR_PX) * HOUR_MS;
-    setDragConflict(computeConflict(d.id, { startAt: newStart, endAt: newEnd }));
-  }
-
-  function onBlockPointerUp(e: React.PointerEvent) {
-    const d = drag.current;
-    if (!d) return;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {
-      /* pointer đã nhả */
-    }
-    drag.current = null;
-    setDragId(null);
-
-    const finalTop = dragTop;
-    // Không di chuyển đáng kể → coi như chạm, bỏ qua.
-    if (Math.abs(finalTop - d.top0) < 2) return;
-
-    const newStart = startAtFromTop(finalTop, day0);
-    const newEnd = newStart + (d.height / HOUR_PX) * HOUR_MS;
-    start(async () => {
-      const res = await updateTimeBlock(d.id, newStart, newEnd);
-      router.refresh();
-      if (res.conflicts.length) {
-        toast(`Trùng lịch: ${res.conflicts[0].label}`, true);
-      } else {
-        toast(`Đã xếp ${fmtTime(newStart)}–${fmtTime(newEnd)}`);
-      }
-    });
-  }
-
-  // Mobile: chạm vào ô giờ trống → mở sheet với giờ điền sẵn theo dòng giờ vừa chạm.
-  function onGridPointerDown(e: React.PointerEvent) {
-    if (drag.current) return; // đang kéo block → bỏ qua
-    if (e.target !== e.currentTarget) return; // chỉ nhận chạm vào nền lưới, không phải lên block
-    const rect = gridRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const y = e.clientY - rect.top;
-    const ms = startAtFromTop(y, day0);
-    setStartHHMM(fmtTime(ms));
-    openSheet();
-  }
-
-  function openSheet() {
+  function openSheet(hhmm?: string) {
     setSelTaskId("");
     setFreeTitle("");
     setArea("work");
     setDurMin(60);
+    if (hhmm) setStartHHMM(hhmm);
     setSheetOpen(true);
   }
 
-  // Tạo block từ sheet: ưu tiên việc đã chọn, nếu không thì dùng tiêu đề tự do.
+  // Callback từ CalendarDragDrop khi block được cập nhật thành công
+  function onBlockUpdated(conflicts: Conflict[]) {
+    router.refresh();
+    if (conflicts.length) {
+      toast(`Trùng lịch: ${conflicts[0].label}`, true);
+    }
+  }
+
+  // Tạo block từ sheet
   function submitCreate() {
     const picked = selTaskId ? tasks.find((t) => t.id === selTaskId) ?? null : null;
     const title = picked ? picked.title : freeTitle.trim();
@@ -194,108 +162,129 @@ export function CalendarClient({
     });
   }
 
+  // ─── Render header tuần ─────────────────────────────────────────────────
+  function WeekRangeLabel() {
+    const days = getWeekDays(weekStart);
+    const first = days[0];
+    const last = days[6];
+    return (
+      <span style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+        {fmtDate(first)} – {fmtDate(last)}
+      </span>
+    );
+  }
+
   return (
     <>
-      <div className="flex between center" style={{ margin: "4px 0 10px" }}>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-          {fmtTime(day0 + START_HOUR * HOUR_MS)}–{fmtTime(day0 + (END_HOUR + 1) * HOUR_MS)}
-        </span>
-        <button className="btn line sm" onClick={openSheet}>
-          <Plus strokeWidth={2} width={16} height={16} /> Thêm khối
-        </button>
-      </div>
-
-      <div className="cal">
-        {/* Lưới giờ nền 07:00–23:00 */}
-        {HOURS.map((h) => (
-          <div className="hour" key={h}>
-            <span className="lab">{String(h).padStart(2, "0")}</span>
-          </div>
-        ))}
-
-        {/* Lớp chứa các khối — bắt chạm nền để mở sheet (mobile chạm-đặt) */}
-        <div
-          className="blocks"
-          ref={gridRef}
-          style={{ pointerEvents: "auto" }}
-          onPointerDown={onGridPointerDown}
-        >
-          {/* Khối cố định hôm nay — read-only, không kéo (AC-05-5) */}
-          {fixedRanges.map((f) => {
-            const top = topPxOf(f.startAt, day0);
-            const height = Math.max(MIN_BLOCK_PX, ((f.endAt - f.startAt) / HOUR_MS) * HOUR_PX);
-            return (
-              <div
-                key={f.id}
-                className="blk fixed"
-                role="img"
-                aria-label={`Khối cố định: ${f.label}, ${fmtTime(f.startAt)}–${fmtTime(f.endAt)}`}
-                style={{ top, height, background: AREA_VAR[f.area] }}
-              >
-                {f.label}
-                <small>
-                  {fmtTime(f.startAt)}–{fmtTime(f.endAt)}
-                </small>
-              </div>
-            );
-          })}
-
-          {/* Time-block (việc đã xếp) — kéo-thả dọc đổi giờ (AC-05-3/05-4) */}
-          {blocks.map((b) => {
-            const dragging = dragId === b.id;
-            const top = dragging ? dragTop : topPxOf(b.startAt, day0);
-            const height = Math.max(MIN_BLOCK_PX, ((b.endAt - b.startAt) / HOUR_MS) * HOUR_PX);
-            // Giờ hiển thị cập nhật realtime trong lúc kéo.
-            const liveStart = dragging ? startAtFromTop(dragTop, day0) : b.startAt;
-            const liveEnd = liveStart + (b.endAt - b.startAt);
-            const conflict = dragging && dragConflict;
-            return (
-              <div
-                key={b.id}
-                className={"blk movable" + (dragging ? " drag" : "") + (conflict ? " conflict" : "")}
-                role="button"
-                aria-label={`Việc đã xếp: ${b.title}, ${fmtTime(b.startAt)}–${fmtTime(b.endAt)}. Kéo để đổi giờ.`}
-                style={{ top, height, background: AREA_VAR[b.area] }}
-                onPointerDown={(e) => onBlockPointerDown(e, b)}
-                onPointerMove={onBlockPointerMove}
-                onPointerUp={onBlockPointerUp}
-              >
-                {b.title}
-                <small>
-                  {fmtTime(liveStart)}–{fmtTime(liveEnd)}
-                </small>
-              </div>
-            );
-          })}
+      {/* ─── Toolbar: toggle Day/Week + điều hướng ─────────────────────────── */}
+      <div className="flex between center" style={{ margin: "4px 0 10px", gap: 8, flexWrap: "wrap" }}>
+        {/* Toggle Day / Week */}
+        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+          <button
+            className={"btn" + (viewMode === "day" ? "" : " ghost")}
+            style={{ borderRadius: 0, gap: 4, padding: "5px 10px", fontSize: 13 }}
+            onClick={() => switchToDay()}
+            aria-pressed={viewMode === "day"}
+            title="Xem ngày"
+          >
+            <CalendarDays width={14} height={14} /> Ngày
+          </button>
+          <button
+            className={"btn" + (viewMode === "week" ? "" : " ghost")}
+            style={{ borderRadius: 0, gap: 4, padding: "5px 10px", fontSize: 13, borderLeft: "1px solid var(--border)" }}
+            onClick={switchToWeek}
+            aria-pressed={viewMode === "week"}
+            title="Xem tuần"
+          >
+            <LayoutGrid width={14} height={14} /> Tuần
+          </button>
         </div>
+
+        {/* Điều hướng */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <button
+            className="btn ghost"
+            style={{ padding: "5px 8px" }}
+            onClick={viewMode === "day" ? prevDay : prevWeek}
+            aria-label={viewMode === "day" ? "Ngày trước" : "Tuần trước"}
+          >
+            <ChevronLeft width={16} height={16} />
+          </button>
+
+          {viewMode === "day" ? (
+            <span style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", minWidth: 120, textAlign: "center" }}>
+              {fmtDate(day0)}
+            </span>
+          ) : (
+            <WeekRangeLabel />
+          )}
+
+          <button
+            className="btn ghost"
+            style={{ padding: "5px 8px" }}
+            onClick={viewMode === "day" ? nextDay : nextWeek}
+            aria-label={viewMode === "day" ? "Ngày tiếp" : "Tuần tiếp"}
+          >
+            <ChevronRight width={16} height={16} />
+          </button>
+
+          <button
+            className="btn line sm"
+            style={{ fontSize: 12, padding: "4px 8px" }}
+            onClick={viewMode === "day" ? todayDay : todayWeek}
+          >
+            Hôm nay
+          </button>
+        </div>
+
+        {/* Nút thêm khối (chỉ hiện ở DayView) */}
+        {viewMode === "day" && (
+          <button className="btn line sm" onClick={() => openSheet()}>
+            <Plus strokeWidth={2} width={16} height={16} /> Thêm khối
+          </button>
+        )}
       </div>
 
-      {/* Chú thích + cách dùng theo thiết bị */}
-      <div className="legend">
-        <span>
-          <i style={{ background: "var(--module-work)" }} /> Khối cố định
-        </span>
-        <span>
-          <i style={{ background: "var(--accent)" }} /> Việc đã xếp (kéo được)
-        </span>
-        <span>
-          <i style={{ background: "var(--danger)" }} /> Trùng lịch
-        </span>
-      </div>
-      <div className="empty" style={{ padding: "10px 4px", textAlign: "left" }}>
-        Máy tính: kéo khối việc lên/xuống để đổi giờ. Điện thoại: chạm ô giờ trống để thêm khối, hoặc kéo khối bằng ngón.
-      </div>
-
-      {blocks.length === 0 && fixedRanges.length === 0 && (
-        <div className="empty">Hôm nay chưa có khối nào — nhấn “Thêm khối” để xếp việc vào lịch.</div>
+      {/* ─── Chú thích thời gian (DayView) ─────────────────────────────────── */}
+      {viewMode === "day" && (
+        <div style={{ marginBottom: 6 }}>
+          <span style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+            {fmtTime(day0 + START_HOUR * HOUR_MS)}–{fmtTime(day0 + (END_HOUR + 1) * HOUR_MS)}
+          </span>
+        </div>
       )}
 
-      {/* FAB phụ: thêm khối nhanh trên mobile */}
-      <button className="fab" aria-label="Thêm khối lịch" onClick={openSheet}>
-        <Plus strokeWidth={2} />
-      </button>
+      {/* ─── View chính ─────────────────────────────────────────────────────── */}
+      {viewMode === "day" ? (
+        <CalendarDragDrop
+          day0={day0}
+          fixed={fixed}
+          blocks={blocks}
+          tasks={tasks}
+          onBlockUpdated={onBlockUpdated}
+          onCreateRequest={(hhmm) => openSheet(hhmm)}
+        />
+      ) : (
+        <CalendarWeekView
+          weekStart={weekStart}
+          fixed={fixed}
+          blocks={blocks}
+          onDayClick={(d) => {
+            setDay0(d);
+            setViewMode("day");
+            router.push(`/calendar?day=${d}`);
+          }}
+        />
+      )}
 
-      {/* Sheet thêm khối */}
+      {/* ─── FAB phụ: thêm khối nhanh trên mobile (DayView) ─────────────────── */}
+      {viewMode === "day" && (
+        <button className="fab" aria-label="Thêm khối lịch" onClick={() => openSheet()}>
+          <Plus strokeWidth={2} />
+        </button>
+      )}
+
+      {/* ─── Sheet thêm khối ────────────────────────────────────────────────── */}
       {sheetOpen && (
         <div
           className="scrim"

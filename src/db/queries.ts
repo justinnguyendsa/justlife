@@ -12,8 +12,8 @@ export async function getSettings(): Promise<Record<string, string>> {
 
 export async function listTasks(area?: string) {
   const where = area
-    ? and(ne(task.status, "done"), eq(task.area, area))
-    : ne(task.status, "done");
+    ? and(ne(task.status, "done"), ne(task.status, "archived"), eq(task.area, area))
+    : and(ne(task.status, "done"), ne(task.status, "archived"));
   return db.select().from(task).where(where)
     .orderBy(sql`${task.priorityScore} IS NULL`, desc(task.priorityScore), desc(task.createdAt));
 }
@@ -28,14 +28,11 @@ export async function getTodayData(now = Date.now()) {
   const top = await db.select().from(task)
     .where(and(ne(task.status, "done"), ne(task.status, "doing"), isNotNull(task.priorityScore)))
     .orderBy(desc(task.priorityScore)).limit(3);
-  const dueSoon = await db.select().from(task)
-    .where(and(ne(task.status, "done"), isNotNull(task.deadlineAt), lte(task.deadlineAt, now + DAY)))
-    .orderBy(asc(task.deadlineAt));
   const day0 = startOfDay(now);
   const blocks = await db.select().from(timeBlock)
     .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt));
   const fixed = await db.select().from(fixedSchedule);
-  return { doing, top, dueSoon, blocks, fixed };
+  return { doing, top, blocks, fixed };
 }
 
 export async function getCalendarData(dayMs = Date.now()) {

@@ -50,3 +50,17 @@ export async function deleteFixedSchedule(id: string) {
   revalidatePath("/settings"); revalidatePath("/calendar"); revalidatePath("/today");
   return { ok: true };
 }
+
+export async function updateFixedSchedule(
+  id: string,
+  input: { label?: string; area?: string; startMin?: number; endMin?: number; weekdayMask?: number }
+) {
+  if (input.startMin !== undefined && input.endMin !== undefined) {
+    if (input.endMin <= input.startMin) return { ok: false, error: "Giờ kết thúc phải sau giờ bắt đầu" };
+  }
+  const existing = await db.select().from(fixedSchedule).where(eq(fixedSchedule.id, id)).limit(1);
+  if (!existing[0]) return { ok: false, error: "Không tìm thấy khối lịch" };
+  await db.update(fixedSchedule).set(input).where(eq(fixedSchedule.id, id));
+  revalidatePath("/settings"); revalidatePath("/calendar"); revalidatePath("/today");
+  return { ok: true };
+}

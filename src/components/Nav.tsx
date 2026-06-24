@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Inbox, CalendarDays, AlarmClock, SlidersHorizontal, Sprout, FolderOpen, MoreHorizontal } from "lucide-react";
+import { LayoutDashboard, Inbox, CalendarDays, AlarmClock, SlidersHorizontal, Sprout, FolderOpen, MoreHorizontal, Target } from "lucide-react";
 
 // Sidebar (desktop): đầy đủ. Bottom-nav (mobile): 4 mục chính + "Khác".
 export const NAV_ITEMS = [
   { href: "/today", label: "Hôm nay", Icon: LayoutDashboard },
   { href: "/tasks", label: "Việc", Icon: Inbox },
+  { href: "/focus", label: "Focus", Icon: Target },
   { href: "/calendar", label: "Lịch", Icon: CalendarDays },
   { href: "/develop", label: "Phát triển", Icon: Sprout },
   { href: "/library", label: "Tài liệu", Icon: FolderOpen },
@@ -17,11 +18,11 @@ export const NAV_ITEMS = [
 const BOTTOM_ITEMS = [
   { href: "/today", label: "Hôm nay", Icon: LayoutDashboard },
   { href: "/tasks", label: "Việc", Icon: Inbox },
+  { href: "/focus", label: "Focus", Icon: Target },
   { href: "/calendar", label: "Lịch", Icon: CalendarDays },
-  { href: "/deadlines", label: "Deadline", Icon: AlarmClock },
   { href: "/more", label: "Khác", Icon: MoreHorizontal },
 ];
-const MORE_PATHS = ["/more", "/develop", "/habits", "/rest", "/study", "/library", "/settings"];
+const MORE_PATHS = ["/more", "/develop", "/habits", "/rest", "/study", "/library", "/settings", "/deadlines"];
 
 export function NavLinks({ variant }: { variant: "side" | "bottom" }) {
   const path = usePathname();

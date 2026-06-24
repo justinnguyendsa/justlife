@@ -12,7 +12,8 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:lms": "tsx src/db/lms/migrate.ts && tsx src/db/lms/seed.ts",
     "db:lms:migrate": "tsx src/db/lms/migrate.ts",
-    "db:lms:seed": "tsx src/db/lms/seed.ts"
+    "db:lms:seed": "tsx src/db/lms/seed.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@auth/core": "0.41.2",
@@ -30,6 +31,7 @@
     "@types/react-dom": "^19.0.3",
     "drizzle-kit": "^0.30.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.9"
   }
 }

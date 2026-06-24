@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import type { Task } from "@/db/schema";
-import { updateTaskPriority, setTaskStatus } from "@/app/actions/tasks";
+import { updateTask, deleteTask, setTaskStatus } from "@/app/actions/tasks";
 import { calcPriorityScore } from "@/lib/priority";
 import { AREA_VAR, AREA_LABEL } from "@/lib/areas";
 import { countdown } from "@/lib/format";
@@ -25,12 +25,15 @@ const STATUSES: { key: string; label: string }[] = [
   { key: "done", label: "Xong" },
 ];
 
+// T17 — số việc mỗi trang
+const PAGE_SIZE = 20;
+
 // Bỏ dấu để tìm kiếm không phân biệt dấu — gõ "bao cao" vẫn ra "báo cáo" (US-02 edge case).
 function fold(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/đ/g, "d").trim();
 }
 
-export function TasksClient({ initial }: { initial: Task[] }) {
+export function TasksClient({ initial, wipLimit }: { initial: Task[]; wipLimit: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [q, setQ] = useState("");
@@ -39,6 +42,14 @@ export function TasksClient({ initial }: { initial: Task[] }) {
   const [effort, setEffort] = useState(3);
   const [impact, setImpact] = useState(3);
 
+  // T15 — edit states cho sheet
+  const [editTitle, setEditTitle] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+
+  // T17 — phân trang
+  const [page, setPage] = useState(1);
+
   // Server là nguồn sự thật; mỗi refresh() trả `initial` mới → đồng bộ lại view.
   const tasks = initial;
   const open = openId ? tasks.find((t) => t.id === openId) ?? null : null;
@@ -46,11 +57,16 @@ export function TasksClient({ initial }: { initial: Task[] }) {
   // Số việc "đang làm" hiện tại — dùng cho cảnh báo WIP mềm (US-04 AC-04-1/04-5).
   const doingCount = useMemo(() => tasks.filter((t) => t.status === "doing").length, [tasks]);
 
-  // Khi mở 1 việc: nạp Effort/Impact hiện có (mặc định 3 nếu chưa đặt).
+  // Khi mở 1 việc: nạp Effort/Impact/Title/Note/Deadline hiện có.
   useEffect(() => {
     if (!open) return;
     setEffort(open.effort ?? 3);
     setImpact(open.impact ?? 3);
+    setEditTitle(open.title);
+    setEditNote(open.note ?? "");
+    setEditDeadline(
+      open.deadlineAt ? new Date(open.deadlineAt).toISOString().split("T")[0] : ""
+    );
   }, [open]);
 
   // Đóng sheet bằng phím Esc (desktop).
@@ -70,27 +86,82 @@ export function TasksClient({ initial }: { initial: Task[] }) {
     });
   }, [tasks, q, area]);
 
-  // Điểm ưu tiên tự tính ngay khi chỉnh Effort/Impact (US-03 AC-03-5), giữ deadline hiện có.
-  const liveScore = open ? calcPriorityScore({ effort, impact, deadlineAt: open.deadlineAt }) : null;
+  // T17 — reset page khi filter thay đổi
+  useEffect(() => setPage(1), [q, area]);
 
+  // T17 — slice theo trang
+  const paged = filtered.slice(0, page * PAGE_SIZE);
+
+  // Điểm ưu tiên tự tính ngay khi chỉnh Effort/Impact (US-03 AC-03-5), giữ deadline hiện có.
+  const liveScore = open
+    ? calcPriorityScore({
+        effort,
+        impact,
+        deadlineAt: editDeadline
+          ? new Date(editDeadline + "T23:59:59").getTime()
+          : open.deadlineAt,
+      })
+    : null;
+
+  // T16 — changeStatus dùng wipLimit từ prop, toast cảnh báo nếu wip_exceeded
   function changeStatus(t: Task, status: string) {
-    // WIP soft-warn: chuyển sang "đang làm" khi đã có ≥2 việc đang làm → vẫn cho, chỉ nhắc nhẹ.
-    const warnWip = status === "doing" && t.status !== "doing" && doingCount >= 2;
     start(async () => {
-      await setTaskStatus(t.id, status);
+      const res = await setTaskStatus(t.id, status);
+      if (res.ok === false && res.wip_exceeded) {
+        toast(
+          `Đang làm ${res.current}/${res.limit} việc — vượt giới hạn WIP`,
+          true
+        );
+        return;
+      }
       if (status === "done") setOpenId(null);
       router.refresh();
-      if (warnWip) toast("Đang làm nhiều việc — cân nhắc tập trung 1 việc", true);
-      else toast(status === "done" ? "Đã đánh dấu xong" : `Đã chuyển: ${labelOf(status)}`);
+      toast(status === "done" ? "Đã đánh dấu xong" : `Đã chuyển: ${labelOf(status)}`);
     });
   }
 
-  function savePriority(t: Task) {
+  // T15 — saveAll: lưu toàn bộ fields (title, note, effort, impact, deadline)
+  function saveAll(t: Task) {
+    if (editTitle.trim() === "") {
+      toast("Vui lòng nhập tiêu đề", true);
+      return;
+    }
+    const newDeadlineAt = editDeadline
+      ? new Date(editDeadline + "T23:59:59").getTime()
+      : null;
     start(async () => {
-      await updateTaskPriority(t.id, { effort, impact });
+      const res = await updateTask(t.id, {
+        title: editTitle.trim(),
+        note: editNote.trim() || undefined,
+        effort,
+        impact,
+        deadlineAt: newDeadlineAt,
+      });
+      if (res.ok === false && res.wip_exceeded) {
+        toast(
+          `Đang làm ${res.current}/${res.limit} việc — vượt giới hạn WIP`,
+          true
+        );
+        return; // không đóng sheet
+      }
+      if (!res.ok) {
+        toast(res.error ?? "Lưu thất bại", true);
+        return;
+      }
       setOpenId(null);
       router.refresh();
-      toast(`Đã lưu ưu tiên · ${calcPriorityScore({ effort, impact, deadlineAt: t.deadlineAt }) ?? "—"} điểm`);
+      toast("Lưu thành công");
+    });
+  }
+
+  // T15 — xóa việc với confirm
+  function handleDelete(t: Task) {
+    if (!confirm("Xóa việc này?")) return;
+    start(async () => {
+      await deleteTask(t.id);
+      setOpenId(null);
+      router.refresh();
+      toast("Đã xóa việc");
     });
   }
 
@@ -112,12 +183,12 @@ export function TasksClient({ initial }: { initial: Task[] }) {
           {tasks.length === 0
             ? "Chưa có việc nào — nhấn nút + để thêm việc đầu tiên."
             : q.trim()
-              ? `Không tìm thấy việc nào khớp “${q.trim()}”.`
+              ? `Không tìm thấy việc nào khớp "${q.trim()}".`
               : "Không có việc nào trong mảng này."}
         </div>
       ) : (
         <div style={{ marginTop: 10 }}>
-          {filtered.map((t) => {
+          {paged.map((t) => {
             const dl = t.deadlineAt != null ? countdown(t.deadlineAt) : null;
             return (
               <button key={t.id} className="task card" onClick={() => setOpenId(t.id)}>
@@ -135,24 +206,55 @@ export function TasksClient({ initial }: { initial: Task[] }) {
               </button>
             );
           })}
+
+          {/* T17 — nút Xem thêm */}
+          {filtered.length > paged.length && (
+            <button className="btn ghost block" onClick={() => setPage((p) => p + 1)}>
+              Xem thêm ({filtered.length - paged.length} việc nữa)
+            </button>
+          )}
         </div>
       )}
 
       {open && (
         <div className="scrim" onClick={(e) => { if (e.target === e.currentTarget) setOpenId(null); }}>
           <div className="sheet" role="dialog" aria-label="Chi tiết việc">
-            <h3>{open.title}</h3>
+
+            {/* T15 — edit title */}
+            <div className="field">
+              <label>Tiêu đề</label>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Tiêu đề việc..."
+              />
+            </div>
+
+            {/* T15 — edit note */}
+            <div className="field" style={{ marginTop: 8 }}>
+              <label>Ghi chú</label>
+              <textarea
+                value={editNote}
+                onChange={(e) => setEditNote(e.target.value)}
+                placeholder="Ghi chú (tùy chọn)..."
+                rows={3}
+              />
+            </div>
 
             <div className="setrow">
               <div><div className="l">Mảng</div><div className="d">phân loại đời sống</div></div>
               <span className={`chip ${open.area}`}>{AREA_LABEL[open.area]}</span>
             </div>
-            {open.deadlineAt != null && (
-              <div className="setrow">
-                <div><div className="l">Hạn chót</div><div className="d">đếm ngược tự động</div></div>
-                <span className={"chip dl" + (countdown(open.deadlineAt).level === "over" ? " over" : "")}>{countdown(open.deadlineAt).label}</span>
-              </div>
-            )}
+
+            {/* T15 — edit deadline */}
+            <div className="field" style={{ marginTop: 8 }}>
+              <label>Hạn chót</label>
+              <input
+                type="date"
+                value={editDeadline}
+                onChange={(e) => setEditDeadline(e.target.value)}
+              />
+            </div>
 
             <div className="row2" style={{ marginTop: 12 }}>
               <div className="setrow" style={{ border: "none", padding: "4px 0" }}>
@@ -184,9 +286,20 @@ export function TasksClient({ initial }: { initial: Task[] }) {
               </div>
             </div>
 
+            {/* T15 — buttons: Đóng + Lưu + Xóa */}
             <div className="row2" style={{ marginTop: 8 }}>
               <button className="btn line block" disabled={pending} onClick={() => setOpenId(null)}>Đóng</button>
-              <button className="btn primary block" disabled={pending} onClick={() => savePriority(open)}>{pending ? "Đang lưu..." : "Lưu ưu tiên"}</button>
+              <button className="btn primary block" disabled={pending} onClick={() => saveAll(open)}>{pending ? "Đang lưu..." : "Lưu"}</button>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <button
+                className="btn ghost block"
+                disabled={pending}
+                onClick={() => handleDelete(open)}
+                style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+              >
+                Xóa việc
+              </button>
             </div>
           </div>
         </div>
