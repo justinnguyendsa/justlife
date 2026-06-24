@@ -11,7 +11,7 @@ import {
   tcSubmission,
 } from "@/db/lms/schema";
 import { decryptFieldOpt } from "@/lib/lms/crypto";
-import { auth } from "../../../auth";
+import { auth } from "@/auth";
 
 // ⭐ Data-access wrapper SCOPED cho cổng học viên (ADR-002 Q4, SPEC-P5a §4, blocker #1).
 // BẤT BIẾN:

@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Flame, Plus, Trash2, Check } from "lucide-react";
+import { Flame, Plus, Trash2, Check, Archive } from "lucide-react";
 import type { listHabits } from "@/db/habits";
-import { createHabit, deleteHabit, toggleHabitToday } from "@/app/actions/habits";
+import { createHabit, deleteHabit, archiveHabit, toggleHabitToday } from "@/app/actions/habits";
 import { toast } from "@/components/Toaster";
 
 // Kiểu trả về của query (đã kèm streak/doneToday/last7) — bám query để khỏi lệch khi schema đổi.
@@ -55,6 +55,15 @@ export function HabitsClient({ habits }: { habits: HabitRow[] }) {
     });
   }
 
+  function archive(h: HabitRow) {
+    if (!confirm(`Lưu trữ thói quen "${h.name}"? Thói quen sẽ ẩn khỏi danh sách nhưng lịch sử vẫn được giữ.`)) return;
+    start(async () => {
+      await archiveHabit(h.id);
+      router.refresh();
+      toast("Đã lưu trữ thói quen");
+    });
+  }
+
   function del(h: HabitRow) {
     if (!confirm(`Xóa thói quen "${h.name}"? Toàn bộ lịch sử chuỗi sẽ mất.`)) return;
     start(async () => {
@@ -93,9 +102,14 @@ export function HabitsClient({ habits }: { habits: HabitRow[] }) {
                     </span>
                   </div>
                 </div>
-                <button className="btn line sm" disabled={pending} onClick={() => del(h)} aria-label={`Xóa ${h.name}`}>
-                  <Trash2 strokeWidth={1.9} />
-                </button>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <button className="btn line sm" disabled={pending} onClick={() => archive(h)} aria-label={`Lưu trữ ${h.name}`} title="Lưu trữ (giữ lịch sử)">
+                    <Archive strokeWidth={1.9} />
+                  </button>
+                  <button className="btn line sm" disabled={pending} onClick={() => del(h)} aria-label={`Xóa ${h.name}`} title="Xóa hoàn toàn">
+                    <Trash2 strokeWidth={1.9} />
+                  </button>
+                </div>
               </div>
 
               {/* 7 ô tuần (cũ → mới) */}

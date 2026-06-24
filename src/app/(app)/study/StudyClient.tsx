@@ -2,9 +2,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, GraduationCap, CalendarClock, ListChecks } from "lucide-react";
+import { Plus, GraduationCap, CalendarClock, ListChecks, Trash2 } from "lucide-react";
 import type { listCourses, getUpcomingStudy } from "@/db/study";
-import { createCourse } from "@/app/actions/study";
+import { createCourse, deleteCourse } from "@/app/actions/study";
 import { countdown } from "@/lib/format";
 import { toast } from "@/components/Toaster";
 
@@ -47,6 +47,15 @@ export function StudyClient({ courses, upcoming }: { courses: CourseRow[]; upcom
       router.refresh();
       if (r.ok) router.push(`/study/${r.id}`);
       toast("Đã tạo môn học");
+    });
+  }
+
+  function del(c: CourseRow) {
+    if (!confirm(`Xóa môn "${c.name}"? Toàn bộ bài tập và ghi chú của môn này sẽ bị xóa.`)) return;
+    start(async () => {
+      await deleteCourse(c.id);
+      router.refresh();
+      toast("Đã xóa môn học");
     });
   }
 
@@ -103,9 +112,9 @@ export function StudyClient({ courses, upcoming }: { courses: CourseRow[]; upcom
           {courses.map((c) => {
             const cd = c.nextDueAt != null ? countdown(c.nextDueAt) : null;
             return (
-              <Link key={c.id} href={`/study/${c.id}`} className="task card" style={{ alignItems: "center" }}>
+              <div key={c.id} className="task card" style={{ alignItems: "center" }}>
                 <span className="bar" style={{ background: "var(--module-study)" }} />
-                <div className="b">
+                <Link href={`/study/${c.id}`} className="b" style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
                   <div className="t">{c.name}</div>
                   <div className="meta">
                     {c.code && <span className="chip study">{c.code}</span>}
@@ -118,8 +127,11 @@ export function StudyClient({ courses, upcoming }: { courses: CourseRow[]; upcom
                       ? <span className={"chip dl" + (cd.level === "over" ? " over" : "")}>gần nhất: {cd.label}</span>
                       : <span className="chip st">chưa có hạn</span>}
                   </div>
-                </div>
-              </Link>
+                </Link>
+                <button className="btn line sm" disabled={pending} onClick={(e) => { e.preventDefault(); del(c); }} aria-label={`Xóa môn ${c.name}`}>
+                  <Trash2 strokeWidth={1.9} />
+                </button>
+              </div>
             );
           })}
         </div>

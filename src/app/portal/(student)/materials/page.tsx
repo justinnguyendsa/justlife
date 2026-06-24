@@ -5,6 +5,7 @@ import {
   getMyMaterials,
   getMyClasses,
 } from "@/lib/lms/portal-queries";
+import { logAccess } from "@/lib/lms/audit";
 import { fmtDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,9 @@ export default async function PortalMaterialsPage() {
     getMyMaterials(studentId),
     getMyClasses(studentId),
   ]);
+
+  // Audit xem tài liệu (append-only, KHÔNG PII thô — chỉ studentId). Best-effort, không chặn render.
+  await logAccess({ actor: studentId, action: "view_material", targetType: "material" });
 
   const classNameById = new Map(classes.map((c) => [c.id, c.name]));
 

@@ -22,6 +22,29 @@ export async function deleteHabit(id: string) {
   return { ok: true };
 }
 
+// Lưu trữ habit (ẩn khỏi danh sách hoạt động, giữ lịch sử log).
+export async function archiveHabit(id: string) {
+  await db.update(hbHabit).set({ archivedAt: Date.now() }).where(eq(hbHabit.id, id));
+  refresh();
+  return { ok: true };
+}
+
+// Log/unlog habit cho một ngày cụ thể (dateKey YYYY-MM-DD Asia/HCM).
+export async function logHabit(habitId: string, dk: string) {
+  const existing = (await db.select().from(hbLog).where(and(eq(hbLog.habitId, habitId), eq(hbLog.dateKey, dk))).limit(1))[0];
+  if (!existing) {
+    await db.insert(hbLog).values({ id: genId(), habitId, dateKey: dk, createdAt: Date.now() });
+  }
+  refresh();
+  return { ok: true };
+}
+export async function unlogHabit(habitId: string, dk: string) {
+  const existing = (await db.select().from(hbLog).where(and(eq(hbLog.habitId, habitId), eq(hbLog.dateKey, dk))).limit(1))[0];
+  if (existing) await db.delete(hbLog).where(eq(hbLog.id, existing.id));
+  refresh();
+  return { ok: true };
+}
+
 // Bật/tắt hoàn thành hôm nay (toggle log ngày hôm nay).
 export async function toggleHabitToday(habitId: string) {
   const today = dateKey();
@@ -40,9 +63,11 @@ export async function addRest(input: { minutes: number; note?: string }) {
   revalidatePath("/rest"); revalidatePath("/develop");
   return { ok: true };
 }
+export { addRest as addRestBlock };
 
 export async function deleteRest(id: string) {
   await db.delete(restBlock).where(eq(restBlock.id, id));
   revalidatePath("/rest"); revalidatePath("/develop");
   return { ok: true };
 }
+export { deleteRest as deleteRestBlock };

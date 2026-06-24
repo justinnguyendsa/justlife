@@ -23,15 +23,23 @@ export function RestClient({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [note, setNote] = useState("");
+  const [customMin, setCustomMin] = useState(""); // nhập số phút tùy chỉnh
 
   function add(minutes: number) {
     const nt = note.trim();
+    if (minutes <= 0 || Number.isNaN(minutes)) { toast("Số phút không hợp lệ", true); return; }
     start(async () => {
       await addRest({ minutes, note: nt || undefined });
-      setNote("");
+      setNote(""); setCustomMin("");
       router.refresh();
       toast(`Đã ghi nghỉ ${minutes} phút`);
     });
+  }
+
+  function addCustom() {
+    const m = parseInt(customMin, 10);
+    if (!customMin.trim() || Number.isNaN(m) || m <= 0) { toast("Nhập số phút hợp lệ (> 0)", true); return; }
+    add(m);
   }
 
   function del(b: RestBlock) {
@@ -86,12 +94,30 @@ export function RestClient({
             placeholder="VD: đi dạo, nghe nhạc, pha trà"
           />
         </div>
-        <div className="row2">
+        {/* Nhanh: 10 / 20 / 30 phút */}
+        <div className="row2" style={{ marginBottom: 10 }}>
           {QUICK.map((m) => (
             <button key={m} className="btn ghost block" disabled={pending} onClick={() => add(m)}>
               <Coffee strokeWidth={1.9} />{m} phút
             </button>
           ))}
+        </div>
+        {/* Tùy chỉnh số phút */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            id="rest-custom-min"
+            type="number"
+            min={1}
+            max={480}
+            value={customMin}
+            onChange={(e) => setCustomMin(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !pending) addCustom(); }}
+            placeholder="Số phút khác"
+            style={{ flex: 1 }}
+          />
+          <button className="btn ghost" disabled={pending || !customMin.trim()} onClick={addCustom} style={{ whiteSpace: "nowrap" }}>
+            <Plus strokeWidth={2} />Thêm
+          </button>
         </div>
       </div>
 
