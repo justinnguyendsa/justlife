@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, UserPlus, ClipboardCheck, FileText, CheckCheck, Download, KeyRound, Copy, Check } from "lucide-react";
-import type { TcClass, TcStudent, TcSession, TcAssignment, TcAttendance, TcGrade } from "@/db/lms/schema";
+import { Plus, Trash2, UserPlus, ClipboardCheck, FileText, CheckCheck, Download, KeyRound, Copy, Check, Link2, Video, ExternalLink, BookOpen } from "lucide-react";
+import type { TcClass, TcStudent, TcSession, TcAssignment, TcAttendance, TcGrade, TcMaterial } from "@/db/lms/schema";
 
 // Bài nộp 1 HV cho 1 bài tập (instructor xem để chấm). originalName đã giải mã ở server.
 export type SubmissionRow = {
@@ -18,8 +18,10 @@ import {
   addStudent, removeStudent,
   createSession, setAttendance, deleteSession,
   createAssignment, setGrade, deleteAssignment,
+  addMaterialLink, deleteMaterial,
 } from "@/app/actions/teaching";
 import { provisionStudentAccess } from "@/app/actions/lms-admin";
+import { getEmbed } from "@/lib/lms/embed";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { toast } from "@/components/Toaster";
 
@@ -35,9 +37,10 @@ type Props = {
   summary: Summary;
   submissionStats: Record<string, SubmissionStat>;
   studentProgress: Record<string, StudentProgress>;
+  materials: TcMaterial[];
 };
 
-type Tab = "students" | "attendance" | "grading";
+type Tab = "students" | "attendance" | "grading" | "materials";
 type AttStatus = "present" | "absent" | "late";
 
 const ATT: { key: AttStatus; label: string }[] = [
@@ -59,7 +62,7 @@ function defaultSessionDate(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignment, submissionsByAssignment, summary, submissionStats, studentProgress }: Props) {
+export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignment, submissionsByAssignment, summary, submissionStats, studentProgress, materials }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [tab, setTab] = useState<Tab>("students");
@@ -89,6 +92,7 @@ export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignm
         <button role="tab" className={tab === "students" ? "on" : ""} onClick={() => setTab("students")}>Học viên</button>
         <button role="tab" className={tab === "attendance" ? "on" : ""} onClick={() => setTab("attendance")}>Điểm danh</button>
         <button role="tab" className={tab === "grading" ? "on" : ""} onClick={() => setTab("grading")}>Chấm bài</button>
+        <button role="tab" className={tab === "materials" ? "on" : ""} onClick={() => setTab("materials")}>Tài liệu</button>
       </div>
 
       {tab === "students" && (
@@ -117,6 +121,9 @@ export function ClassDetailClient({ detail, attendanceBySession, gradesByAssignm
           start={start}
           router={router}
         />
+      )}
+      {tab === "materials" && (
+        <MaterialsTab classId={detail.cls.id} materials={materials} pending={pending} start={start} router={router} />
       )}
     </>
   );
@@ -707,6 +714,95 @@ function GradingTab({ classId, students, assignments, gradesByAssignment, submis
               <button className="btn primary block" disabled={pending} onClick={saveGrade}>{pending ? "Đang lưu..." : "Lưu điểm"}</button>
             </div>
           </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ============ TAB: TÀI LIỆU ============ */
+function MaterialsTab({ classId, materials, pending, start, router }: {
+  classId: string; materials: TcMaterial[]; pending: boolean; start: Start; router: Router;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+
+  function add() {
+    const t = title.trim();
+    const u = url.trim();
+    if (!t) { toast("Nhập tiêu đề tài liệu", true); return; }
+    if (!u) { toast("Dán link tài liệu/video", true); return; }
+    start(async () => {
+      const r = await addMaterialLink({ classId, title: t, url: u });
+      if (!r.ok) { toast(r.error ?? "Không thêm được", true); return; }
+      setTitle(""); setUrl(""); setAdding(false);
+      router.refresh();
+      toast("Đã thêm tài liệu");
+    });
+  }
+  function del(m: TcMaterial) {
+    if (!confirm(`Xóa tài liệu "${m.title}"?`)) return;
+    start(async () => {
+      await deleteMaterial(m.id, classId);
+      router.refresh();
+      toast("Đã xóa tài liệu");
+    });
+  }
+
+  return (
+    <>
+      <div className="card">
+        {!adding ? (
+          <button className="btn line block" disabled={pending} onClick={() => setAdding(true)}>
+            <Plus strokeWidth={2} />Thêm tài liệu / video
+          </button>
+        ) : (
+          <>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label>Tiêu đề</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Bài giảng tuần 1 — Biến & vòng lặp" />
+            </div>
+            <div className="field" style={{ marginBottom: 6 }}>
+              <label>Đường dẫn (YouTube, Vimeo, Google Drive, hoặc link tài liệu)</label>
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://youtu.be/..." autoComplete="off" />
+            </div>
+            <p className="d" style={{ margin: "0 0 10px" }}>Link YouTube/Vimeo/Drive sẽ hiện video xem ngay trong cổng học viên.</p>
+            <div className="row2">
+              <button className="btn line block" disabled={pending} onClick={() => { setAdding(false); setTitle(""); setUrl(""); }}>Hủy</button>
+              <button className="btn primary block" disabled={pending} onClick={add}>{pending ? "Đang lưu..." : "Lưu tài liệu"}</button>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="sec">
+        <h2><span className="secdot" style={{ background: "var(--module-teach)" }} /><BookOpen strokeWidth={1.8} style={{ width: 15, height: 15 }} />Tài liệu lớp</h2>
+        <span className="cnt">{materials.length}</span>
+      </div>
+      {materials.length === 0 ? (
+        <div className="empty">Chưa có tài liệu — thêm link bài giảng/video ở trên để học viên xem trong cổng.</div>
+      ) : (
+        <div className="card">
+          {materials.map((m) => {
+            const embed = getEmbed(m.url);
+            return (
+              <div className="setrow" key={m.id} style={{ gap: 8 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="l" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</div>
+                  <div className="d" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    {embed ? (<><Video strokeWidth={1.8} style={{ width: 12, height: 12 }} />Video · {embed.kind}</>)
+                      : m.url ? (<><Link2 strokeWidth={1.8} style={{ width: 12, height: 12 }} />Liên kết</>)
+                      : (<><FileText strokeWidth={1.8} style={{ width: 12, height: 12 }} />Tệp</>)}
+                  </div>
+                </div>
+                {m.url && (
+                  <a className="btn line sm" href={m.url} target="_blank" rel="noopener noreferrer" aria-label="Mở tài liệu"><ExternalLink strokeWidth={1.9} /></a>
+                )}
+                <button className="btn line sm" disabled={pending} onClick={() => del(m)} aria-label={`Xóa ${m.title}`}><Trash2 strokeWidth={1.9} /></button>
+              </div>
+            );
+          })}
         </div>
       )}
     </>

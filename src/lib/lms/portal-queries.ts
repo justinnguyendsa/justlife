@@ -156,6 +156,25 @@ export async function getMyMaterials(studentId: string) {
     );
 }
 
+/**
+ * Ném lỗi nếu studentId KHÔNG được phép tải material (theo fileRef): material phải thuộc lớp HV
+ * là thành viên + visibility='class'. Trả metadata material (đã xác nhận quyền) cho route tải file.
+ * Không tiết lộ "ref tồn tại hay không" — cùng một lỗi cho not-found và not-member (chống IDOR).
+ */
+export async function assertCanAccessMaterial(studentId: string, fileRef: string) {
+  const ids = await myClassIds(studentId);
+  const rows = await lmsDb
+    .select()
+    .from(tcMaterial)
+    .where(eq(tcMaterial.fileRef, fileRef))
+    .limit(1);
+  const m = rows[0];
+  if (!m || !ids.includes(m.classId) || m.visibility !== "class") {
+    throw new Error("FORBIDDEN: không có quyền với tài liệu này.");
+  }
+  return m;
+}
+
 // ===== Bài nộp (Stage 4) — luôn scope theo studentId; chống IDOR object-level =====
 
 /** Bài nộp của TÔI cho 1 bài tập (mới nhất nếu nhiều). null nếu chưa nộp. */

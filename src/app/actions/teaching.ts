@@ -2,10 +2,11 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
-import { tcClass, tcStudent, tcSession, tcAttendance, tcAssignment, tcGrade } from "@/db/lms/schema";
+import { tcClass, tcStudent, tcSession, tcAttendance, tcAssignment, tcGrade, tcMaterial } from "@/db/lms/schema";
 import { genId } from "@/lib/id";
 import { deleteStudentCascade } from "@/lib/lms/cascade";
 import { logAccess } from "@/lib/lms/audit";
+import { deleteMaterial as deleteMaterialFile } from "@/lib/lms/storage";
 
 function refreshClass(id?: string) {
   revalidatePath("/teaching/classes");
@@ -107,6 +108,45 @@ export async function deleteSession(id: string, classId: string) {
 export async function deleteAssignment(id: string, classId: string) {
   await lmsDb.delete(tcGrade).where(eq(tcGrade.assignmentId, id));
   await lmsDb.delete(tcAssignment).where(eq(tcAssignment.id, id));
+  refreshClass(classId);
+  return { ok: true };
+}
+
+// ===== Tài liệu lớp (P-LMS-1) — link/video ngay; upload file chờ object storage (P-LMS-0) =====
+export async function addMaterialLink(input: { classId: string; title: string; url: string }) {
+  const title = input.title.trim();
+  const url = input.url.trim();
+  if (!title) return { ok: false, error: "Nhập tiêu đề tài liệu." };
+  // CHỈ nhận http/https (chống javascript:/data: → stored-XSS khi mở link).
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      return { ok: false, error: "Đường dẫn phải bắt đầu bằng http:// hoặc https://" };
+    }
+  } catch {
+    return { ok: false, error: "Đường dẫn không hợp lệ." };
+  }
+  await lmsDb.insert(tcMaterial).values({
+    id: genId(),
+    classId: input.classId,
+    title,
+    url,
+    fileRef: null,
+    mime: null,
+    size: null,
+    visibility: "class",
+    createdAt: Date.now(),
+  });
+  await logAccess({ actor: "instructor", action: "create_material", targetType: "material" });
+  refreshClass(input.classId);
+  return { ok: true };
+}
+
+export async function deleteMaterial(id: string, classId: string) {
+  const m = (await lmsDb.select().from(tcMaterial).where(eq(tcMaterial.id, id)).limit(1))[0];
+  if (m?.fileRef) await deleteMaterialFile(m.fileRef); // xóa file đĩa nếu có (tài liệu dạng file)
+  await lmsDb.delete(tcMaterial).where(eq(tcMaterial.id, id));
+  await logAccess({ actor: "instructor", action: "delete_material", targetType: "material", targetId: id });
   refreshClass(classId);
   return { ok: true };
 }

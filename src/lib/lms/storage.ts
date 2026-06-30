@@ -2,24 +2,25 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomBytes } from "node:crypto";
 
-// 🟡 Vùng đĩa LMS RIÊNG cho bài nộp học viên (SPEC-P5a §5, blocker #3).
-// TÁCH HOÀN TOÀN khỏi personal `data/library` (R-JL-TWO-FACES-01): không dùng chung thư mục,
-// không dùng chung route. `data/` đã gitignore → bài nộp KHÔNG lên git.
+// 🟡 Vùng đĩa LMS RIÊNG (SPEC-P5a §5). TÁCH HOÀN TOÀN khỏi personal data/library (R-JL-TWO-FACES-01).
+// 2 kho con: submissions (bài nộp HV) + materials (tài liệu lớp do giảng viên đăng). data/ đã gitignore.
 //
 // Bảo mật:
-//  - `fileRef` sinh bằng crypto (randomBytes) → không đoán được (chống dò file qua URL).
-//  - Guard path-traversal: mọi đường dẫn phải nằm TRONG SUBMISSIONS_DIR (resolveInside).
-//  - Lưu theo ĐÚNG fileRef (không kèm tên gốc vào tên file trên đĩa → tên gốc🔒 chỉ ở DB).
+//  - fileRef sinh bằng crypto (randomBytes) → không đoán được (chống dò file qua URL).
+//  - Guard path-traversal: mọi đường dẫn phải nằm TRONG kho con (resolveInside).
+//  - Lưu theo ĐÚNG fileRef (không kèm tên gốc → tên gốc🔒 chỉ ở DB).
 //
-// 🗣️ Bình dân: bài nộp của học viên cất ở "kho riêng của lớp" (không lẫn với tủ tài liệu cá nhân);
-//    tên file trên đĩa là mã ngẫu nhiên, không lộ tên thật, và không ai trèo ra ngoài kho được.
+// ⚠ go-live (P-LMS-0): Vercel serverless KHÔNG giữ đĩa → cần object storage adapter; hiện local-disk.
+//
+// 🗣️ Bình dân: file của lớp cất ở "kho riêng", tên trên đĩa là mã ngẫu nhiên, không ai trèo ra ngoài kho.
 
 const SUBMISSIONS_DIR = path.resolve(process.cwd(), "data", "lms", "submissions");
+const MATERIALS_DIR = path.resolve(process.cwd(), "data", "lms", "materials");
 
-// Guard path-traversal: đường dẫn phải nằm TRONG SUBMISSIONS_DIR.
-function resolveInside(ref: string): string {
-  const p = path.resolve(SUBMISSIONS_DIR, ref);
-  if (p !== SUBMISSIONS_DIR && !p.startsWith(SUBMISSIONS_DIR + path.sep)) {
+// Guard path-traversal: đường dẫn phải nằm TRONG `dir`.
+function resolveInside(dir: string, ref: string): string {
+  const p = path.resolve(dir, ref);
+  if (p !== dir && !p.startsWith(dir + path.sep)) {
     throw new Error("invalid path");
   }
   return p;
@@ -30,26 +31,31 @@ export function genFileRef(): string {
   return randomBytes(16).toString("hex");
 }
 
-/** Lưu buffer bài nộp theo ref (ref phải do genFileRef sinh). Trả về ref đã lưu. */
-export async function writeSubmission(ref: string, buf: Buffer): Promise<string> {
+async function writeRef(dir: string, ref: string, buf: Buffer): Promise<string> {
   // Chặn ref lạ (chỉ hex an toàn) — phòng hờ nếu ref đến từ nguồn khác.
   if (!/^[0-9a-f]{8,}$/.test(ref)) throw new Error("invalid ref");
-  const dest = resolveInside(ref);
-  await fs.mkdir(SUBMISSIONS_DIR, { recursive: true });
+  const dest = resolveInside(dir, ref);
+  await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(dest, buf);
   return ref;
 }
-
-/** Đọc buffer bài nộp theo ref (đã guard path-traversal). */
-export async function readSubmission(ref: string): Promise<Buffer> {
-  return fs.readFile(resolveInside(ref));
+async function readRef(dir: string, ref: string): Promise<Buffer> {
+  return fs.readFile(resolveInside(dir, ref));
 }
-
-/** Xóa file bài nộp theo ref (dùng ở cascade delete S5). Không lỗi nếu đã xóa. */
-export async function deleteSubmission(ref: string): Promise<void> {
+async function deleteRef(dir: string, ref: string): Promise<void> {
   try {
-    await fs.unlink(resolveInside(ref));
+    await fs.unlink(resolveInside(dir, ref));
   } catch {
     /* đã xóa / không tồn tại */
   }
 }
+
+// ---- Bài nộp học viên ----
+export const writeSubmission = (ref: string, buf: Buffer) => writeRef(SUBMISSIONS_DIR, ref, buf);
+export const readSubmission = (ref: string) => readRef(SUBMISSIONS_DIR, ref);
+export const deleteSubmission = (ref: string) => deleteRef(SUBMISSIONS_DIR, ref);
+
+// ---- Tài liệu lớp (giảng viên đăng) ----
+export const writeMaterial = (ref: string, buf: Buffer) => writeRef(MATERIALS_DIR, ref, buf);
+export const readMaterial = (ref: string) => readRef(MATERIALS_DIR, ref);
+export const deleteMaterial = (ref: string) => deleteRef(MATERIALS_DIR, ref);

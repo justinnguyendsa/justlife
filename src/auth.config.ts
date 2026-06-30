@@ -107,6 +107,9 @@ export const authConfig = {
       // 3) owner-auth BẬT (cloud): các route luôn-public vẫn cho qua.
       if (isAlwaysPublic(path)) return true;
 
+      // 3b) Học viên đã đăng nhập được phép gọi API LMS của CHÍNH MÌNH (route tự scope theo studentId).
+      if (path.startsWith("/api/lms/") && auth?.role === "student") return true;
+
       // 4) Còn lại (Personal OS + Dạy học + API tương ứng) → yêu cầu role owner.
       if (auth?.role === "owner") return true;
 

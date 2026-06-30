@@ -1,6 +1,6 @@
 import { asc, desc, eq, and, inArray } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
-import { tcClass, tcStudent, tcSession, tcAttendance, tcAssignment, tcGrade, tcSubmission } from "@/db/lms/schema";
+import { tcClass, tcStudent, tcSession, tcAttendance, tcAssignment, tcGrade, tcSubmission, tcMaterial } from "@/db/lms/schema";
 import { decryptFieldOpt } from "@/lib/lms/crypto";
 
 export async function listClasses() {
@@ -51,6 +51,11 @@ export async function getSubmissionById(id: string) {
   const s = (await lmsDb.select().from(tcSubmission).where(eq(tcSubmission.id, id)).limit(1))[0];
   if (!s) return null;
   return { ...s, originalName: decName(s.originalName) };
+}
+
+// Tài liệu của lớp (instructor quản lý). Mới nhất trước.
+export async function getClassMaterials(classId: string) {
+  return lmsDb.select().from(tcMaterial).where(eq(tcMaterial.classId, classId)).orderBy(desc(tcMaterial.createdAt));
 }
 
 /** Tổng quan lớp: số HV, bài tập, % nộp TB, điểm trung bình. */

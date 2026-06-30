@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { getClassDetail, getAttendance, getGrades, getSubmissions, getClassSummary, getAssignmentSubmissionStats, getStudentProgressInClass } from "@/db/teaching";
+import { getClassDetail, getAttendance, getGrades, getSubmissions, getClassSummary, getAssignmentSubmissionStats, getStudentProgressInClass, getClassMaterials } from "@/db/teaching";
 import { getFilesForClass } from "@/db/library";
 import type { TcAttendance, TcGrade } from "@/db/lms/schema";
 import { PageHeader } from "@/components/PageHeader";
@@ -41,6 +41,8 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
 
   const studentProgress = await getStudentProgressInClass(id);
 
+  const materials = await getClassMaterials(id);
+
   return (
     <>
       <Link href="/teaching/classes" className="btn line sm" style={{ marginBottom: 10 }}>
@@ -55,6 +57,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
         summary={summary}
         submissionStats={submissionStats}
         studentProgress={studentProgress}
+        materials={materials}
       />
       <LinkedFiles files={files} />
     </>

@@ -24,6 +24,8 @@ export type AuditAction =
   | "download"
   | "grade_edit"
   | "delete_student"
+  | "create_material"
+  | "delete_material"
   | "export";
 
 export type AuditTargetType =

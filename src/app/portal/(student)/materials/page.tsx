@@ -1,17 +1,18 @@
 import { redirect } from "next/navigation";
-import { BookOpen, ExternalLink, FileText, Clock } from "lucide-react";
+import { BookOpen, ExternalLink, FileText, Download } from "lucide-react";
 import {
   getSessionStudentId,
   getMyMaterials,
   getMyClasses,
 } from "@/lib/lms/portal-queries";
+import { getEmbed } from "@/lib/lms/embed";
 import { logAccess } from "@/lib/lms/audit";
 import { fmtDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 // "Tài liệu lớp": tài liệu các lớp tôi thuộc về (đã scoped + visibility='class' ở wrapper).
-// S3: hiện LINK ngoài (mở được) + metadata file. Tải file an toàn qua route riêng là S4.
+// P-LMS-1: link YouTube/Vimeo/Drive → nhúng video xem ngay; file → tải an toàn qua /api/lms/material/[ref].
 
 function fmtSize(bytes: number | null | undefined): string | null {
   if (bytes == null || bytes <= 0) return null;
@@ -29,7 +30,7 @@ export default async function PortalMaterialsPage() {
     getMyClasses(studentId),
   ]);
 
-  // Audit xem tài liệu (append-only, KHÔNG PII thô — chỉ studentId). Best-effort, không chặn render.
+  // Audit xem tài liệu (append-only, KHÔNG PII thô — chỉ studentId). Best-effort.
   await logAccess({ actor: studentId, action: "view_material", targetType: "material" });
 
   const classNameById = new Map(classes.map((c) => [c.id, c.name]));
@@ -41,7 +42,7 @@ export default async function PortalMaterialsPage() {
     <>
       <div className="portal-hello">
         <h1>Tài liệu lớp</h1>
-        <p className="sub">Tài liệu giảng viên chia sẻ cho lớp của bạn.</p>
+        <p className="sub">Tài liệu &amp; bài giảng giảng viên chia sẻ cho lớp của bạn.</p>
       </div>
 
       <div className="sec">
@@ -58,34 +59,44 @@ export default async function PortalMaterialsPage() {
           {rows.map((m) => {
             const size = fmtSize(m.size);
             const className = classNameById.get(m.classId);
+            const embed = getEmbed(m.url);
             return (
-              <div key={m.id} className="card portal-row">
-                <FileText strokeWidth={2} aria-hidden className="portal-row-ic" />
-                <div className="grow">
-                  <div className="t portal-strong">{m.title}</div>
-                  <div className="meta">
-                    {className && <span className="chip teach">{className}</span>}
-                    {size && <span className="chip st">{size}</span>}
-                    {m.createdAt != null && <span className="chip st">{fmtDate(m.createdAt)}</span>}
+              <div key={m.id} className="card portal-material">
+                <div className="portal-row" style={{ padding: 0 }}>
+                  <FileText strokeWidth={2} aria-hidden className="portal-row-ic" />
+                  <div className="grow">
+                    <div className="t portal-strong">{m.title}</div>
+                    <div className="meta">
+                      {className && <span className="chip teach">{className}</span>}
+                      {size && <span className="chip st">{size}</span>}
+                      {m.createdAt != null && <span className="chip st">{fmtDate(m.createdAt)}</span>}
+                    </div>
                   </div>
+
+                  {!embed && m.url && (
+                    <a href={m.url} target="_blank" rel="noopener noreferrer" className="btn line sm">
+                      <ExternalLink strokeWidth={2} aria-hidden />Mở
+                    </a>
+                  )}
+                  {!embed && !m.url && m.fileRef && (
+                    <a href={`/api/lms/material/${m.fileRef}`} className="btn line sm" download>
+                      <Download strokeWidth={2} aria-hidden />Tải
+                    </a>
+                  )}
                 </div>
 
-                {m.url ? (
-                  <a
-                    href={m.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn line sm"
-                  >
-                    <ExternalLink strokeWidth={2} aria-hidden />
-                    Mở
-                  </a>
-                ) : m.fileRef ? (
-                  <span className="chip st portal-soon" title="Tải tệp an toàn sẽ có ở bản cập nhật sau">
-                    <Clock strokeWidth={2} aria-hidden />
-                    Sắp có
-                  </span>
-                ) : null}
+                {embed && (
+                  <div className="portal-embed">
+                    <iframe
+                      src={embed.src}
+                      title={m.title}
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      sandbox="allow-scripts allow-same-origin allow-presentation"
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
