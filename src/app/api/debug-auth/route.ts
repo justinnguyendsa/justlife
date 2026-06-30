@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     // match:false + attemptEmailDomain cho biết bạn đã bấm nhầm tài khoản nào.
     lastSignin: (globalThis as Record<string, unknown>).__jlLastSignin ?? null,
     // Đánh dấu bản deploy — xác nhận bạn đang chạy đúng bản mới nhất.
-    buildMarker: "diag-v3-cookies",
+    buildMarker: "diag-v4-rolefix",
     // Cookie phiên có tới được server không? (chỉ TÊN cookie, không có giá trị/secret)
     cookieAuthRelated: req.cookies
       .getAll()
