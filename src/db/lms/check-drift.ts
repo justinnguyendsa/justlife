@@ -32,7 +32,21 @@ function declaredTables(): string[] {
   return [...names].sort();
 }
 
+/**
+ * In RÕ đang kiểm DB nào. Script KHÔNG tự nạp .env, nên `npm run db:lms:check` trần sẽ trỏ
+ * vào file local — chạy xong thấy "Không lệch" mà tưởng Turso đã ổn là hiểu sai nguy hiểm.
+ * Token trong URL được che để không in secret ra màn hình/log.
+ */
+function targetLabel(): string {
+  const raw = process.env.LMS_DATABASE_URL || "file:lms.db";
+  const isRemote = raw.startsWith("libsql:") || raw.startsWith("https:");
+  const safe = raw.replace(/([?&](authToken|auth_token)=)[^&]+/gi, "$1***");
+  return `${safe}   ${isRemote ? "<<< REMOTE (Turso) >>>" : "<<< FILE LOCAL tren may ban >>>"}`;
+}
+
 async function main() {
+  console.log(`Dang kiem: ${targetLabel()}`);
+  console.log("");
   const declared = declaredTables();
   const rs = await lmsLibsql.execute(
     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
@@ -43,7 +57,7 @@ async function main() {
   const extra = [...actual].filter((t) => !declared.includes(t)).sort();
 
   console.log(`Bảng khai trong schema.ts : ${declared.length}`);
-  console.log(`Bảng có thật trong lms.db : ${actual.size}`);
+  console.log(`Bảng có thật trong DB     : ${actual.size}`);
 
   if (extra.length) {
     console.log(`\n⚠ Có trong DB nhưng không còn trong schema (${extra.length}):`);

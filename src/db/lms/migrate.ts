@@ -121,6 +121,14 @@ const STATEMENTS = [
 ];
 
 async function main() {
+  // Script KHÔNG tự nạp .env. Chạy trần = sửa FILE LOCAL, không phải Turso. In rõ đích đến
+  // để không bao giờ migrate nhầm DB rồi tưởng đã xong.
+  const target = process.env.LMS_DATABASE_URL || "file:lms.db";
+  const isRemote = target.startsWith("libsql:") || target.startsWith("https:");
+  console.log(
+    "Dich den: " + target.replace(/([?&](authToken|auth_token)=)[^&]+/gi, "$1***") +
+      (isRemote ? "   <<< REMOTE (Turso) >>>" : "   <<< FILE LOCAL tren may ban >>>"),
+  );
   for (const sql of STATEMENTS) {
     try {
       await lmsLibsql.execute(sql);
@@ -132,7 +140,7 @@ async function main() {
       throw e;
     }
   }
-  console.log("✓ migrate: tạo bảng xong (lms.db)");
+  console.log(`✓ migrate: tạo bảng xong — ${isRemote ? "Turso (remote)" : "file local"}`);
 }
 
 main().catch((e) => {
