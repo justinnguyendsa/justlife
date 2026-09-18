@@ -47,7 +47,9 @@ const DEV_ONLY_PUBLIC_EXACT = ["/ui-kit"];
 function isAlwaysPublic(path: string): boolean {
   if (ALWAYS_PUBLIC_EXACT.includes(path)) return true;
   if (process.env.NODE_ENV !== "production" && DEV_ONLY_PUBLIC_EXACT.includes(path)) return true;
-  return ALWAYS_PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
+  // Khớp theo RANH GIỚI đoạn đường dẫn, không phải khớp chuỗi trần:
+  // "/api/library/file" KHÔNG được vô tình mở cho "/api/library/file-admin".
+  return ALWAYS_PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : p + "/"));
 }
 
 // API nào? (chưa-auth → trả 401 thay vì redirect — đúng chuẩn cho client gọi API)
@@ -117,7 +119,13 @@ export const authConfig = {
         return auth?.role === "student";
       }
 
-      // 2) Ngoài /portal, ở PRODUCTION mà thiếu cấu hình owner → FAIL-CLOSED (P0-T02):
+      // 2) API của HỌC VIÊN — xét TRƯỚC nhánh fail-closed bên dưới.
+      //    Student-auth chỉ cần AUTH_SECRET, KHÔNG liên quan gì tới OWNER_EMAIL/AUTH_GOOGLE_ID.
+      //    Nếu để sau, chủ dự án gõ sai biến của mình là học viên mất luôn khả năng nộp bài
+      //    và tải tài liệu — phạt nhầm người.
+      if (path.startsWith("/api/lms/") && auth?.role === "student") return true;
+
+      // 3) Ngoài /portal, ở PRODUCTION mà thiếu cấu hình owner → FAIL-CLOSED (P0-T02):
       //    chặn hết trừ route luôn-public. Thà app không dùng được còn hơn mở toang.
       if (ownerAuthMisconfiguredInProd()) {
         if (isAlwaysPublic(path)) return true;
@@ -129,15 +137,12 @@ export const authConfig = {
         return Response.redirect(url);
       }
 
-      // 3) Ngoài /portal: owner-auth TẮT ở môi trường KHÔNG phải production (máy local)
+      // 4) Ngoài /portal: owner-auth TẮT ở môi trường KHÔNG phải production (máy local)
       //    → cho qua tất cả, giữ DX cũ.
       if (!ownerAuthEnabledEnv()) return true;
 
-      // 4) owner-auth BẬT (cloud): các route luôn-public vẫn cho qua.
+      // 5) owner-auth BẬT (cloud): các route luôn-public vẫn cho qua.
       if (isAlwaysPublic(path)) return true;
-
-      // 5) Học viên đã đăng nhập được phép gọi API LMS của CHÍNH MÌNH (route tự scope theo studentId).
-      if (path.startsWith("/api/lms/") && auth?.role === "student") return true;
 
       // 6) Còn lại (Personal OS + Dạy học + API tương ứng) → yêu cầu role owner.
       if (auth?.role === "owner") return true;

@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { libFile, libFolder } from "@/db/schema";
 import { readStored } from "@/lib/storage";
 import { getOwnerSession, isOwnerAuthEnabled } from "@/lib/auth-guard";
+import { ownerAuthMisconfiguredInProd } from "@/auth.config";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,13 @@ export const runtime = "nodejs";
  *    chia sẻ) mới tải được; gỡ chia sẻ là khoá luôn.
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // 🛡️ Route này nằm trong ALWAYS_PUBLIC_PREFIXES nên nhánh fail-closed của middleware
+  // KHÔNG chạy cho nó → phải tự kiểm. Thiếu cấu hình owner ở production mà không chặn ở đây
+  // thì isOwnerAuthEnabled() = false ⇒ allowed = true ⇒ mở toàn bộ thư viện cá nhân ra Internet.
+  if (ownerAuthMisconfiguredInProd()) {
+    return new Response("Không tìm thấy", { status: 404 });
+  }
+
   const { id } = await params;
   const f = (await db.select().from(libFile).where(eq(libFile.id, id)).limit(1))[0];
 

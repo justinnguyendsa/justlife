@@ -24,10 +24,16 @@ export function isOwnerAuthEnabled(): boolean {
  * Gọi ở đầu Server Component nhạy cảm nếu muốn chắc chắn (middleware vốn đã chặn lớp ngoài).
  */
 export async function requireOwner(): Promise<void> {
-  if (!isOwnerAuthEnabled()) return; // local dev → mở
+  // Production mà thiếu cấu hình owner → CHẶN, không phải mở (nhất quán với denyIfNotOwner).
+  // Nếu để `return` ở đây thì cả 88 guard vừa gắn đều thành vô tác dụng trong đúng kịch bản
+  // mà fail-closed sinh ra để chống.
+  if (ownerAuthMisconfiguredInProd()) {
+    redirect("/login?error=Configuration");
+  }
+  if (!isOwnerAuthEnabled()) return; // máy local (không phải production) → mở, giữ DX cũ
   const session = await auth();
   if (session?.role !== "owner") {
-    redirect("/login");
+    redirect("/login?error=WrongRole");
   }
 }
 

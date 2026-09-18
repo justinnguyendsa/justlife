@@ -13,4 +13,3 @@ lms.db-*
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
-lms.db.bak-p0
