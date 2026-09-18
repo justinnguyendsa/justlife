@@ -264,7 +264,7 @@
 .scorebox .n { font-family: var(--font-mono); font-weight: 800; font-size: 24px; color: var(--warning); }
 
 /* ===== sheet / scrim ===== */
-.scrim { position: fixed; inset: 0; background: rgba(16,32,44,.42); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.scrim { position: fixed; inset: 0; background: color-mix(in oklab, var(--foreground) 45%, transparent); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
 .sheet { background: var(--surface); width: 100%; max-width: 520px; border-radius: 20px 20px 0 0; padding: 16px 16px 24px;
   max-height: 88vh; overflow-y: auto; animation: up .22s ease; }
 @media (min-width: 768px) { .scrim { align-items: center; } .sheet { border-radius: var(--radius-lg); } }
