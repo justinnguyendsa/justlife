@@ -29,6 +29,14 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
+import type { Task } from "@/db/schema";
+import type { DeadlineEntry } from "@/db/deadlines";
+import { DeadlineRow } from "@/components/DeadlineRow";
+import { PageHeader } from "@/components/PageHeader";
+import { Section } from "@/components/Section";
+import { TaskCard } from "@/components/TaskCard";
+import { AREA_VAR } from "@/lib/areas";
+
 export const metadata: Metadata = {
   title: "Bộ UI · justlife",
   description: "Trang tham chiếu design system — shadcn/ui.",
@@ -52,6 +60,48 @@ const AREAS = [
   ["area-study", "Học tập"],
   ["area-growth", "Phát triển"],
 ] as const;
+
+// Dữ liệu mẫu CỐ ĐỊNH (không đọc DB) chỉ để soi giao diện component thật.
+const NOW = Date.UTC(2026, 8, 18, 3, 0, 0);
+
+function sampleTask(over: Partial<Task>): Task {
+  return {
+    id: "demo",
+    title: "Việc mẫu",
+    note: null,
+    area: "work",
+    status: "todo",
+    effort: 3,
+    impact: 4,
+    deadlineAt: null,
+    priorityScore: 72,
+    createdAt: NOW,
+    updatedAt: NOW,
+    doneAt: null,
+    ...over,
+  };
+}
+
+const SAMPLE_DEADLINES: DeadlineEntry[] = [
+  {
+    id: "d1",
+    title: "Nộp bài tập Thống kê nhiều biến",
+    area: "study",
+    dueAt: NOW + 3 * 3600_000,
+    source: "study",
+    sub: "Phân tích dữ liệu",
+    href: "#",
+  },
+  {
+    id: "d2",
+    title: "Gửi báo cáo tuần cho sếp",
+    area: "work",
+    dueAt: NOW - 2 * 3600_000,
+    source: "task",
+    sub: "Việc",
+    href: "#",
+  },
+];
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -227,6 +277,45 @@ export default function UiKitPage() {
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-20 w-full" />
         </div>
+      </Block>
+
+      <Block title="Component thật của app (đã migrate sang shadcn)">
+        <PageHeader
+          title="Hôm nay"
+          sub="Thứ Sáu, 18/09 · 3 việc cần xong"
+          action={<Button size="sm">Xếp lịch</Button>}
+        />
+        <Section color={AREA_VAR.work} title="ĐANG LÀM" cnt="1 việc" />
+        <TaskCard
+          task={sampleTask({
+            title: "Chuẩn bị báo cáo tuần",
+            status: "doing",
+            deadlineAt: NOW + 5 * 3600_000,
+          })}
+          now={NOW}
+        />
+        <Section color={AREA_VAR.study} title="ƯU TIÊN CAO" cnt="2 việc" />
+        <TaskCard
+          task={sampleTask({
+            title: "Đọc chương 4 — Hồi quy logistic",
+            area: "study",
+            priorityScore: 88,
+          })}
+          trailingScore
+          now={NOW}
+        />
+        <TaskCard
+          task={sampleTask({
+            title: "Soạn đề kiểm tra lớp Python",
+            area: "teach",
+            priorityScore: null,
+          })}
+          now={NOW}
+        />
+        <Section color={AREA_VAR.growth} title="DEADLINE GẦN" cnt="2 mục" />
+        {SAMPLE_DEADLINES.map((d) => (
+          <DeadlineRow key={d.id} e={d} now={NOW} />
+        ))}
       </Block>
 
       <Block title="Lớp cũ (compat) — tự nhận design system mới">

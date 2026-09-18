@@ -1,42 +1,80 @@
 ---
 name: design-system
-description: Locked visual design system for justlife — colors, fonts, icons, layout rules. Frontend and design agents MUST pull tokens from here, never hardcode.
+description: Locked visual design system for justlife — shadcn/ui tokens, fonts, icons, layout rules. Frontend and design agents MUST pull tokens from here, never hardcode.
 type: context
-updated: 2026-06-20
-locked: 2026-04-28
+updated: 2026-09-18
+locked: 2026-09-18
+supersedes: "Cobalt & Amber (chốt 2026-04-28) — bản cũ lưu ở src/styles/tokens.cobalt-amber.bak.css"
 ---
 
-# 🎨 justlife — Design System (ĐÃ CHỐT 2026-04-28)
+# 🎨 justlife · justudy — Design System (ĐÃ CHỐT 2026-09-18 — shadcn/ui)
 
-> **RÀNG BUỘC tuyệt đối.** `frontend-builder`, `uiux-spec-writer`, `design-system-worker` đọc file này TRƯỚC khi làm UI. KHÔNG hardcode màu/font — luôn dùng CSS variable từ `tokens.css`.
+> **RÀNG BUỘC tuyệt đối.** `frontend-builder`, `uiux-spec-writer`, `design-system-worker` đọc file này TRƯỚC khi làm UI. KHÔNG hardcode màu/font — luôn dùng CSS variable từ `tokens.css` hoặc utility Tailwind ánh xạ từ nó.
 
-## 1. Màu — "Cobalt & Amber" (Option B)
+> ⚠️ **Thay hệ 2026-09-18.** Bảng màu "Cobalt & Amber" (chốt 2026-04-28) ĐÃ BỊ THAY bằng bộ biến chuẩn **shadcn/ui** theo yêu cầu chủ dự án. Áp dụng cho CẢ justlife (Personal OS) và justudy (cổng học viên `/portal`).
 
-| Vai trò | Token | Hex |
+## 1. Màu — bộ biến shadcn/ui (oklch)
+
+Single source of truth: `src/styles/tokens.css`. Đổi theme = sửa DUY NHẤT file đó.
+
+| Nhóm | Token |
+|---|---|
+| Nền / chữ | `--background` · `--foreground` |
+| Bề mặt | `--card` · `--card-foreground` · `--popover` · `--popover-foreground` |
+| Nhấn | `--primary` · `--secondary` · `--accent` (+ `-foreground`) |
+| Chữ mờ | `--muted` · `--muted-foreground` |
+| Trạng thái | `--destructive` · `--success` · `--warning` (+ `-foreground`) |
+| Viền / input / focus | `--border` · `--input` · `--ring` |
+| Phân loại | `--chart-1..5` |
+| Sidebar | `--sidebar*` |
+
+### Mảng đời sống (riêng của justlife)
+
+Ánh xạ lên bảng `--chart-*`, kèm token chữ riêng để đạt tương phản:
+
+| Mảng | Nền | Chữ trên nền tint |
 |---|---|---|
-| Primary (cobalt) | `--brand` | `#1578E8` |
-| Accent (amber) | `--accent` | `#FFA800` |
-| Module · Work | `--module-work` | `#1578E8` (cobalt) |
-| Module · Teach | `--module-teach` | `#1A9A78` (teal) |
-| Module · Study | `--module-study` | `#7B4FD6` (violet) |
-| Module · Growth | `--module-growth` | `#FFA800` (amber) |
+| Công việc | `--area-work` | `--area-work-foreground` |
+| Dạy học | `--area-teach` | `--area-teach-foreground` |
+| Học tập | `--area-study` | `--area-study-foreground` |
+| Phát triển | `--area-growth` | `--area-growth-foreground` |
 
-Palette nền tảng: **xanh dương · vàng · trắng · đen**. Full HSL tokens (light/dark) sống trong `src/styles/tokens.css` — single source of truth.
+> Vì sao cần `*-foreground` riêng: màu `--chart-*` gốc quá sáng, dùng làm chữ 12px trên nền tint thì chỉ đạt ~3.0:1 — trượt WCAG AA. Bản đậm hơn đưa lên >4.5:1.
+> 🗣️ Bình dân: màu biểu đồ đẹp nhưng làm chữ thì mờ, nên chữ dùng bản đậm hơn của cùng màu.
+
+### Dark mode
+
+Bật bằng `.dark` (chuẩn shadcn) **hoặc** `[data-theme="dark"]` (toggle sẵn có). `tokens.css` khai báo cả hai selector; `globals.css` có `@custom-variant dark` khớp cả hai.
+
+`--destructive` và `--success` ở dark mode cố tình SÁNG (đọc tốt khi làm chữ trên nền tối) → khi dùng làm **nền đặc** thì `*-foreground` đảo thành màu TỐI.
 
 ### ❌ KHÔNG
 - **KHÔNG gradient** — chỉ solid fill (ràng buộc của chủ dự án).
-- **KHÔNG hardcode** `#1578E8`, `orange`, `rgb(...)` trong component — dùng `var(--brand)`.
-- **KHÔNG** thêm màu ngoài palette mà chưa hỏi chủ dự án.
+- **KHÔNG hardcode** hex / `orange` / `rgb(...)` trong component — dùng token hoặc utility.
+- **KHÔNG** thêm màu ngoài bộ token mà chưa hỏi chủ dự án.
+
+## 1b. Tầng kỹ thuật
+
+| Thứ | Chốt |
+|---|---|
+| CSS engine | **Tailwind v4** (`@tailwindcss/postcss`) |
+| Component | **shadcn/ui** style `new-york`, base `slate` — `src/components/ui/*` |
+| Gộp class | `cn()` = clsx + tailwind-merge (`src/lib/utils.ts`) |
+| Cấu hình CLI | `components.json` |
+| Trang tham chiếu | `/ui-kit` (chỉ dev, production tự 404) |
+
+### Lớp cầu nối (compat) — tạm thời
+`globals.css` map token cũ (`--brand`, `--surface`, `--module-*`…) sang biến shadcn để các file chưa migrate vẫn chạy và tự nhận design system mới. **Xoá dần, KHÔNG thêm mới.**
 
 ## 2. Font (T1)
 
 | Vai trò | Font | Nguồn |
 |---|---|---|
-| Heading | **Be Vietnam Pro** | Google (render dấu tiếng Việt sạch ở size lớn) |
-| Body | **Inter** | Google |
-| Số/streak/mono | **Geist Mono** | local |
+| Heading | **Inter** | `next/font/google`, subset `latin` + `vietnamese` |
+| Body | **Inter** | như trên (shadcn dùng 1 họ chữ cho cả hai) |
+| Số/streak/mono | stack `ui-monospace` | không cần tải thêm font |
 
-Cơ chế nạp font tùy stack architect chốt (`next/font` nếu Next.js; `@font-face` nếu khác). Token: `--font-heading`, `--font-body`, `--font-mono`.
+Nạp bằng `next/font/google` trong `src/app/layout.tsx`. Token: `--font-sans`, `--font-mono` (`--font-heading`/`--font-body` giữ làm alias cho code cũ).
 
 ## 3. Icon
 
