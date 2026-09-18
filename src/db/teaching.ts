@@ -1,6 +1,6 @@
 import { asc, desc, eq, and, inArray } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
-import { tcClass, tcStudent, tcSession, tcAttendance, tcAssignment, tcGrade, tcSubmission, tcMaterial } from "@/db/lms/schema";
+import { tcClass, tcStudent, tcSession, tcAttendance, tcAssignment, tcGrade, tcSubmission, tcMaterial, tcModule, tcLesson, tcCourse } from "@/db/lms/schema";
 import { decryptFieldOpt } from "@/lib/lms/crypto";
 
 export async function listClasses() {
@@ -167,4 +167,42 @@ export async function getStudentProgressInClass(classId: string) {
     result[sid] = { submitted: mySubs.size, total: totalAssignments, avgScore };
   }
   return result;
+}
+
+/** P-LMS-2: Lấy modules + lessons của một khóa học. */
+export async function getCourseStructure(courseId: string) {
+  const modules = await lmsDb
+    .select()
+    .from(tcModule)
+    .where(eq(tcModule.courseId, courseId))
+    .orderBy(asc(tcModule.position));
+
+  const lessons = await lmsDb
+    .select()
+    .from(tcLesson)
+    .where(inArray(tcLesson.moduleId, modules.map(m => m.id)))
+    .orderBy(asc(tcLesson.position));
+
+  // Group lessons by moduleId
+  const lessonsByModule = new Map<string, typeof lessons>();
+  for (const l of lessons) {
+    const arr = lessonsByModule.get(l.moduleId) ?? [];
+    arr.push(l);
+    lessonsByModule.set(l.moduleId, arr);
+  }
+
+  return modules.map(m => ({
+    ...m,
+    lessons: lessonsByModule.get(m.id) ?? [],
+  }));
+}
+
+/** P-LMS-2: Lấy thông tin khóa học. */
+export async function getCourseById(courseId: string) {
+  const rows = await lmsDb
+    .select()
+    .from(tcCourse)
+    .where(eq(tcCourse.id, courseId))
+    .limit(1);
+  return rows[0] ?? null;
 }

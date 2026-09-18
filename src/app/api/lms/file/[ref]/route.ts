@@ -30,6 +30,14 @@ export async function GET(
   const studentId = await getSessionStudentId();
   if (!studentId) return new Response("Bạn cần đăng nhập.", { status: 401 });
 
+  // Consent enforcement (P-LMS-0): API-level gate, không chỉ UI.
+  const { hasValidConsent, getIsMinor } = await import("@/lib/lms/consent");
+  const { auth: getAuth } = await import("@/auth");
+  const session = await getAuth();
+  const isMinor = session?.isMinor ?? await getIsMinor(studentId);
+  const consented = await hasValidConsent(studentId, isMinor);
+  if (!consented) return new Response("Bạn cần hoàn tất đồng ý xử lý dữ liệu.", { status: 403 });
+
   // 2) Ownership: chỉ chủ bài nộp (không tiết lộ ref tồn tại hay không — cùng một lỗi 403).
   let sub: Awaited<ReturnType<typeof assertOwnsSubmission>>;
   try {

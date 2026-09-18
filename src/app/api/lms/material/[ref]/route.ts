@@ -21,6 +21,14 @@ export async function GET(
   const studentId = await getSessionStudentId();
   if (!studentId) return new Response("Chưa đăng nhập.", { status: 401 });
 
+  // Consent enforcement (P-LMS-0): API-level gate, không chỉ UI.
+  const { hasValidConsent, getIsMinor } = await import("@/lib/lms/consent");
+  const { auth: getAuth } = await import("@/auth");
+  const session = await getAuth();
+  const isMinor = session?.isMinor ?? await getIsMinor(studentId);
+  const consented = await hasValidConsent(studentId, isMinor);
+  if (!consented) return new Response("Bạn cần hoàn tất đồng ý xử lý dữ liệu.", { status: 403 });
+
   let material;
   try {
     material = await assertCanAccessMaterial(studentId, ref); // scope: thành viên lớp + visibility class

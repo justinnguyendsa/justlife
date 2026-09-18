@@ -69,18 +69,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = (profile?.email ?? user?.email)?.toLowerCase().trim();
       const verified = profile?.email_verified !== false; // Google trả true cho tài khoản hợp lệ
       const ok = Boolean(owner && email && email === owner && verified);
-      // 🔎 Ghi lại lần thử gần nhất (in-memory) cho /api/debug-auth + log Vercel. KHÔNG lưu email đầy đủ.
-      const diag = {
-        ok,
-        match: owner === email,
-        attemptEmailDomain: email?.split("@")[1] ?? null,
-        attemptEmailLen: email?.length ?? 0,
-        ownerEmailLen: owner?.length ?? 0,
-        verified,
-        provider: account?.provider ?? null,
-        at: new Date().toISOString(),
-      };
-      (globalThis as Record<string, unknown>).__jlLastSignin = diag;
+      // Log lần thử đăng nhập thất bại (minimal, KHÔNG lưu email đầy đủ).
       if (!ok) {
         // Học viên đăng nhập bằng Gmail (sau khi đã liên kết bằng linkGoogleEmail).
         // Bất biến bảo mật:
@@ -110,14 +99,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               u.studentId = found[0].studentId;
               u.lmsUserId = found[0].id;
               u.isMinor = found[0].isMinor === 1;
-              console.log("[student-gmail-signin] OK, studentId:", found[0].studentId);
+
               return true;
             }
           } catch (e) {
             console.error("[student-gmail-signin] error", e);
           }
         }
-        console.error("[owner-signin] REJECT", diag);
+        console.error("[owner-signin] REJECT — domain:", email?.split("@")[1] ?? "unknown");
         return false; // người lạ / email chưa verify / học viên chưa liên kết → TỪ CHỐI
       }
       return true;

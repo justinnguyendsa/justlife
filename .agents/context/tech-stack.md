@@ -2,7 +2,7 @@
 name: tech-stack
 description: The chosen tech stack for justlife. DECIDED 2026-06-21 via ADR-001 (+ ADR-002 for LMS auth/DB). All engineering agents read this before coding.
 type: context
-updated: 2026-06-21
+updated: 2026-09-18
 status: DECIDED
 adr: .agents/specs/architecture/ADR-001-tech-stack-21062026.md
 adr_lms: .agents/specs/architecture/ADR-002-multiuser-lms-21062026.md
@@ -18,8 +18,8 @@ adr_lms: .agents/specs/architecture/ADR-002-multiuser-lms-21062026.md
 |---|---|---|
 | Framework | **Next.js 15 (App Router)** full-stack | FE + BE chung 1 codebase, 1 deploy |
 | Ngôn ngữ | **TypeScript** end-to-end | |
-| Styling | **CSS variables** trong `src/styles/tokens.css` | đã chốt design-system; no Tailwind-hardcode, no gradient |
-| Font | Be Vietnam Pro · Inter · Geist Mono | nạp qua `next/font` |
+| Styling | **Tailwind v4 + shadcn/ui**, biến trong `src/styles/tokens.css` | thay hệ 2026-09-18 (trước đó: CSS thuần "Cobalt & Amber"); no hardcode, no gradient |
+| Font | Inter (+ mono stack hệ thống) | nạp qua `next/font/google`, subset vietnamese |
 | Icon | lucide-react | stroke 1.5–2 |
 | API / BE | Next.js Route Handlers / Server Actions | tách `/api/personal/*` vs `/api/lms/*` |
 | ORM | **Drizzle** | |

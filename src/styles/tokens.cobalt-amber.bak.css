@@ -1,0 +1,90 @@
+/* ============================================================
+   justlife — Design Tokens (single source of truth)
+   Cobalt & Amber · locked 2026-04-28 · KHÔNG hardcode màu/font ở nơi khác.
+   ============================================================ */
+:root {
+  /* Brand */
+  --brand: #1578E8;
+  --brand-600: #0E6FE0;
+  --brand-weak: #E7F0FB;
+  --accent: #FFA800;
+  --accent-weak: #FFF3DC;
+
+  /* Module / mảng đời sống */
+  --module-work: #1578E8;   /* cobalt */
+  --module-teach: #1A9A78;  /* teal */
+  --module-study: #7B4FD6;  /* violet */
+  --module-growth: #FFA800; /* amber */
+  --work-weak: #E7F0FB;
+  --teach-weak: #E4F4EF;
+  --study-weak: #F0EAFB;
+  --growth-weak: #FFF3DC;
+
+  /* Neutrals */
+  --bg: #EEF2F7;
+  --surface: #FFFFFF;
+  --surface-2: #F4F7FB;
+  --text-primary: #16202C;
+  --text-secondary: #5B6B7B;
+  --text-faint: #94A3B2;
+  --border: #E6EBF1;
+  --border-strong: #D3DCE6;
+
+  /* Status */
+  --danger: #D7263D;
+  --danger-weak: #FBEAEA;
+  --ok: #1A9A78;
+  --ok-weak: #E4F4EF;
+  --warn: #B5740A;
+
+  /* Typography (no gradient anywhere) */
+  --font-heading: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* Spacing scale */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+
+  /* Radius */
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-pill: 999px;
+
+  /* Elevation (subtle, flat-friendly) */
+  --shadow-sm: 0 1px 2px rgba(16, 32, 44, .06);
+  --shadow-md: 0 4px 14px rgba(16, 32, 44, .08);
+  --shadow-lg: 0 14px 40px rgba(16, 32, 44, .14);
+
+  /* Layout */
+  --sidebar-w: 232px;
+  --content-max: 880px;
+
+  /* Semantic (chữ trên nền màu + panel tối cố định) — tránh hardcode trong component */
+  --on-color: #FFFFFF;     /* chữ/icon trên nền brand/module */
+  --on-amber: #3D2A00;     /* chữ trên nền amber */
+  --ink-deep: #11202E;     /* panel nhấn tối: scorebox, toast */
+  --focus-bg: #0E1822;     /* nền Focus mode */
+  --focus-sub: #7FA8D8;    /* phụ đề trong Focus */
+  --hairline-on: rgba(255, 255, 255, .5); /* viền mảnh trên nền màu */
+}
+
+/* Dark mode — bật bằng [data-theme="dark"] trên <html>. Mặc định LIGHT (không theo hệ thống). */
+:root[data-theme="dark"] {
+  --bg: #0E1620;
+  --surface: #16222E;
+  --surface-2: #1B2A38;
+  --text-primary: #ECF2F8;
+  --text-secondary: #9DB0C2;
+  --text-faint: #6B7E90;
+  --border: #243443;
+  --border-strong: #2E4153;
+  --brand-weak: #122B45;
+  --accent-weak: #3A2C0A;
+  --work-weak: #122B45;
+  --teach-weak: #0F2C24;
+  --study-weak: #241640;
+  --growth-weak: #3A2C0A;
+  --danger-weak: #3A1620;
+  --ok-weak: #0F2C24;
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, .45);
+}

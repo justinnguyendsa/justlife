@@ -26,14 +26,37 @@ export type AuditAction =
   | "delete_student"
   | "create_material"
   | "delete_material"
-  | "export";
+  | "delete_class"
+  | "delete_course"
+  | "export"
+  | "start_quiz"
+  | "submit_quiz"
+  | "create_quiz"
+  | "delete_quiz"
+  | "issue_certificate"
+  | "revoke_certificate"
+  | "submit_code"
+  | "run_code"
+  | "create_thread"
+  | "create_post"
+  | "hide_post"
+  | "self_enrol";
 
 export type AuditTargetType =
   | "grade"
   | "material"
   | "submission"
   | "student"
-  | "class";
+  | "class"
+  | "course"
+  | "quiz"
+  | "question"
+  | "certificate"
+  | "code_problem"
+  | "code_submission"
+  | "thread"
+  | "post"
+  | "enrol_code";
 
 export interface LogAccessInput {
   /** Ai thực hiện: studentId (HV) hoặc "instructor". Mặc định suy actorType từ đây. */

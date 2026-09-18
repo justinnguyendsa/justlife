@@ -3,9 +3,16 @@ import { lmsDb } from "@/db/lms/client";
 import {
   accessCode,
   consentLog,
+  enrollment,
   lmsUser,
+  tcAssignment,
   tcAttendance,
+  tcClass,
+  tcCourse,
   tcGrade,
+  tcMaterial,
+  tcMaterialProgress,
+  tcSession,
   tcStudent,
   tcSubmission,
 } from "@/db/lms/schema";
@@ -108,4 +115,73 @@ export async function deleteStudentCascade(
   });
 
   return { studentId, deleted, filesDeleted };
+}
+
+/** S0: Xóa cascade toàn bộ lớp (ADR-003 QĐ6). Xóa: students (cascade), sessions, attendance, assignments, grades, submissions, materials, enrollments. */
+export async function deleteClassCascade(
+  classId: string,
+  actor: string = "instructor",
+): Promise<{ classId: string; studentsDeleted: number }> {
+  if (!classId) throw new Error("[lms/cascade] classId bắt buộc.");
+
+  // Xóa từng student cascade (sẽ xóa grades, attendance, submissions, lms_user, consent, access_code)
+  const students = await lmsDb.select({ id: tcStudent.id }).from(tcStudent).where(eq(tcStudent.classId, classId));
+  for (const s of students) {
+    await deleteStudentCascade(s.id, actor);
+  }
+
+  // Xóa sessions + attendance của lớp
+  const sessions = await lmsDb.select({ id: tcSession.id }).from(tcSession).where(eq(tcSession.classId, classId));
+  if (sessions.length > 0) {
+    await lmsDb.delete(tcAttendance).where(inArray(tcAttendance.sessionId, sessions.map(s => s.id)));
+    await lmsDb.delete(tcSession).where(eq(tcSession.classId, classId));
+  }
+
+  // Xóa assignments + grades
+  const assignments = await lmsDb.select({ id: tcAssignment.id }).from(tcAssignment).where(eq(tcAssignment.classId, classId));
+  if (assignments.length > 0) {
+    await lmsDb.delete(tcGrade).where(inArray(tcGrade.assignmentId, assignments.map(a => a.id)));
+    await lmsDb.delete(tcAssignment).where(eq(tcAssignment.classId, classId));
+  }
+
+  // Xóa materials
+  const materials = await lmsDb.select({ fileRef: tcMaterial.fileRef }).from(tcMaterial).where(eq(tcMaterial.classId, classId));
+  for (const m of materials) {
+    if (m.fileRef) await deleteSubmission(m.fileRef); // reuse file delete
+  }
+  await lmsDb.delete(tcMaterial).where(eq(tcMaterial.classId, classId));
+
+  // Xóa material progress
+  await lmsDb.delete(tcMaterialProgress).where(
+    inArray(tcMaterialProgress.materialId, materials.map(m => m.fileRef).filter(Boolean) as string[])
+  );
+
+  // Xóa enrollments của lớp
+  await lmsDb.delete(enrollment).where(eq(enrollment.classId, classId));
+
+  // Xóa lớp
+  await lmsDb.delete(tcClass).where(eq(tcClass.id, classId));
+
+  await logAccess({ actor, actorType: "instructor", action: "delete_class", targetType: "class", targetId: classId });
+  return { classId, studentsDeleted: students.length };
+}
+
+/** S0: Xóa cascade toàn bộ khóa học + tất cả lớp thuộc khóa. */
+export async function deleteCourseCascade(
+  courseId: string,
+  actor: string = "instructor",
+): Promise<{ courseId: string; classesDeleted: number }> {
+  if (!courseId) throw new Error("[lms/cascade] courseId bắt buộc.");
+
+  // Xóa từng class cascade
+  const classes = await lmsDb.select({ id: tcClass.id }).from(tcClass).where(eq(tcClass.courseId, courseId));
+  for (const c of classes) {
+    await deleteClassCascade(c.id, actor);
+  }
+
+  // Xóa khóa học
+  await lmsDb.delete(tcCourse).where(eq(tcCourse.id, courseId));
+
+  await logAccess({ actor, actorType: "instructor", action: "delete_course", targetType: "course", targetId: courseId });
+  return { courseId, classesDeleted: classes.length };
 }

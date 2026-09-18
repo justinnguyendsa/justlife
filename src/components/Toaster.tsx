@@ -1,23 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
 
+import { toast as sonnerToast } from "sonner";
+
+export { Toaster } from "@/components/ui/sonner";
+
+/**
+ * Giữ nguyên chữ ký cũ `toast(message, warn?)` để ~10 nơi gọi không phải sửa,
+ * nhưng bên dưới đã chạy bằng sonner (chuẩn shadcn) thay cho toast tự viết.
+ */
 export function toast(message: string, warn = false) {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent("jl-toast", { detail: { message, warn } }));
+  if (warn) sonnerToast.error(message);
+  else sonnerToast.success(message);
 }
 
-export function Toaster() {
-  const [t, setT] = useState<{ message: string; warn: boolean } | null>(null);
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    function on(e: Event) {
-      const d = (e as CustomEvent).detail;
-      setT(d);
-      clearTimeout(timer);
-      timer = setTimeout(() => setT(null), 2200);
-    }
-    window.addEventListener("jl-toast", on);
-    return () => { window.removeEventListener("jl-toast", on); clearTimeout(timer); };
-  }, []);
-  return <div className={"toast" + (t ? " show" : "") + (t?.warn ? " warn" : "")}>{t?.message}</div>;
-}
+/** Truy cập đầy đủ API sonner khi cần (loading, promise, action...). */
+export { sonnerToast };

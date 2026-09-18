@@ -142,6 +142,10 @@ export async function issueFixedAccessCodeForDev(
   rawCode: string,
   opts?: { ttlMs?: number },
 ): Promise<IssueResult> {
+  // 🛡️ P-LMS-0: CHẶN chạy ở production — code cố định KHÔNG bao giờ được dùng trên cloud.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("[access-code] issueFixedAccessCodeForDev bị CẤM ở production. Dùng issueAccessCode.");
+  }
   if (!studentId) throw new Error("[access-code] studentId bắt buộc.");
   // DEV: chấp nhận code cho trước; lưu hash của dạng đã chuẩn hóa (verify dùng cùng normalizeCode → khớp).
   const normalized = normalizeCode(rawCode);

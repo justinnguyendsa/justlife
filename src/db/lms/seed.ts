@@ -19,6 +19,11 @@ const H = 3_600_000, D = 86_400_000;
 const today0 = now - (now % D); // mốc 00:00 UTC gần nhất (đủ cho seed demo)
 
 async function main() {
+  // 🛡️ P-LMS-0: CHẶN seed ở production — dữ liệu mẫu + code cố định KHÔNG được chạy trên cloud.
+  if (process.env.NODE_ENV === "production") {
+    console.error("❌ seed KHÔNG được chạy ở production.");
+    process.exit(1);
+  }
   // reset (idempotent) — thứ tự con → cha
   await lmsDb.delete(accessAudit); await lmsDb.delete(consentLog); await lmsDb.delete(tcSubmission);
   await lmsDb.delete(accessCode); await lmsDb.delete(lmsUser);
