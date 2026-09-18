@@ -5,10 +5,14 @@
 *.log
 .env
 .env*.local
-local.db
-local.db-*
-lms.db
-lms.db-*
+# DB SQLite + MỌI bản sao. Dùng wildcard rộng vì `lms.db` + `lms.db-*` KHÔNG phủ được
+# `lms.db.bak-p0` (dấu chấm ≠ dấu gạch) — các file này chứa PII học viên, kể cả trẻ vị
+# thành niên; lọt vào git là nằm trong lịch sử vĩnh viễn.
+local.db*
+lms.db*
+*.db.bak*
+*.sqlite
+*.sqlite3
 /data
 *.tsbuildinfo
 next-env.d.ts

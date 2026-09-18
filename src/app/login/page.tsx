@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 function authErrorMessage(code: string): string {
   switch (code) {
     case "AccessDenied":
-      return "Tài khoản Google vừa dùng KHÔNG khớp OWNER_EMAIL → hãy đăng nhập đúng Gmail đã cấu hình (thử cửa sổ ẩn danh).";
+      return "Tài khoản Google vừa dùng không có quyền truy cập. Hãy đăng nhập đúng tài khoản chủ sở hữu (thử cửa sổ ẩn danh nếu trình duyệt đang nhớ tài khoản khác).";
     case "Configuration":
       return "Máy chủ chưa được cấu hình đúng nên đang tạm khoá toàn bộ để an toàn. Kiểm tra biến môi trường xác thực trên môi trường này (chi tiết nằm trong log máy chủ).";
     case "WrongRole":
