@@ -1,90 +1,141 @@
 /* ============================================================
-   justlife — Design Tokens (single source of truth)
-   Cobalt & Amber · locked 2026-04-28 · KHÔNG hardcode màu/font ở nơi khác.
+   justlife · justudy — Design Tokens (single source of truth)
+   Bộ biến shadcn/ui · thay cho "Cobalt & Amber" (2026-09-18)
+   Bản cũ lưu tại: tokens.cobalt-amber.bak.css
+   ------------------------------------------------------------
+   KHÔNG hardcode màu/font ở nơi khác. Đổi theme = sửa DUY NHẤT file này.
+   Màu dạng oklch: dải rộng hơn sRGB, nội suy mượt, chuẩn shadcn hiện hành.
    ============================================================ */
+
 :root {
-  /* Brand */
-  --brand: #1578E8;
-  --brand-600: #0E6FE0;
-  --brand-weak: #E7F0FB;
-  --accent: #FFA800;
-  --accent-weak: #FFF3DC;
+  --radius: 0.625rem;
 
-  /* Module / mảng đời sống */
-  --module-work: #1578E8;   /* cobalt */
-  --module-teach: #1A9A78;  /* teal */
-  --module-study: #7B4FD6;  /* violet */
-  --module-growth: #FFA800; /* amber */
-  --work-weak: #E7F0FB;
-  --teach-weak: #E4F4EF;
-  --study-weak: #F0EAFB;
-  --growth-weak: #FFF3DC;
+  /* Nền & chữ */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
 
-  /* Neutrals */
-  --bg: #EEF2F7;
-  --surface: #FFFFFF;
-  --surface-2: #F4F7FB;
-  --text-primary: #16202C;
-  --text-secondary: #5B6B7B;
-  --text-faint: #94A3B2;
-  --border: #E6EBF1;
-  --border-strong: #D3DCE6;
+  /* Bề mặt nổi */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
 
-  /* Status */
-  --danger: #D7263D;
-  --danger-weak: #FBEAEA;
-  --ok: #1A9A78;
-  --ok-weak: #E4F4EF;
-  --warn: #B5740A;
+  /* Nhấn chính / phụ */
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
 
-  /* Typography (no gradient anywhere) */
-  --font-heading: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  /* Chữ mờ / nền nhấn nhẹ */
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
 
-  /* Spacing scale */
-  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
-  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  /* Cảnh báo */
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
 
-  /* Radius */
-  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-pill: 999px;
+  /* Viền / input / focus ring */
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.704 0.04 256.788);
 
-  /* Elevation (subtle, flat-friendly) */
-  --shadow-sm: 0 1px 2px rgba(16, 32, 44, .06);
-  --shadow-md: 0 4px 14px rgba(16, 32, 44, .08);
-  --shadow-lg: 0 14px 40px rgba(16, 32, 44, .14);
+  /* Bảng màu phân loại (chart) — dùng cho MẢNG ĐỜI SỐNG của justlife */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
 
-  /* Layout */
-  --sidebar-w: 232px;
-  --content-max: 880px;
+  /* Sidebar */
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
 
-  /* Semantic (chữ trên nền màu + panel tối cố định) — tránh hardcode trong component */
-  --on-color: #FFFFFF;     /* chữ/icon trên nền brand/module */
-  --on-amber: #3D2A00;     /* chữ trên nền amber */
-  --ink-deep: #11202E;     /* panel nhấn tối: scorebox, toast */
-  --focus-bg: #0E1822;     /* nền Focus mode */
-  --focus-sub: #7FA8D8;    /* phụ đề trong Focus */
-  --hairline-on: rgba(255, 255, 255, .5); /* viền mảnh trên nền màu */
+  /* Trạng thái bổ sung (ngoài shadcn core, justlife cần).
+     L của --success hạ xuống 0.52 để chữ trắng đạt WCAG AA (>=4.5:1) trên nền đặc. */
+  --success: oklch(0.52 0.13 163.225);
+  --success-foreground: oklch(0.984 0.003 247.858);
+  --warning: oklch(0.769 0.188 70.08);
+  --warning-foreground: oklch(0.216 0.045 70.08);
+
+  /* Mảng đời sống — alias ngữ nghĩa trỏ vào bảng chart ở trên */
+  --area-work: var(--chart-3);
+  --area-teach: var(--chart-2);
+  --area-study: var(--chart-1);
+  --area-growth: var(--chart-4);
+
+  /* Chữ của mảng đời sống khi đặt trên nền TINT nhạt (badge/chip).
+     Dùng bản đậm hơn --area-*, vì màu chart gốc quá sáng → chữ 12px không đạt AA. */
+  --area-work-foreground: oklch(0.36 0.07 227.392);
+  --area-teach-foreground: oklch(0.38 0.1 184.704);
+  --area-study-foreground: oklch(0.44 0.19 41.116);
+  --area-growth-foreground: oklch(0.36 0.1 70.08);
+
+  /* Typography */
+  --font-heading: var(--font-sans);
+  --font-body: var(--font-sans);
 }
 
-/* Dark mode — bật bằng [data-theme="dark"] trên <html>. Mặc định LIGHT (không theo hệ thống). */
+/* Dark mode — hỗ trợ CẢ hai: .dark (chuẩn shadcn) và [data-theme="dark"] (toggle sẵn có của justlife) */
+.dark,
 :root[data-theme="dark"] {
-  --bg: #0E1620;
-  --surface: #16222E;
-  --surface-2: #1B2A38;
-  --text-primary: #ECF2F8;
-  --text-secondary: #9DB0C2;
-  --text-faint: #6B7E90;
-  --border: #243443;
-  --border-strong: #2E4153;
-  --brand-weak: #122B45;
-  --accent-weak: #3A2C0A;
-  --work-weak: #122B45;
-  --teach-weak: #0F2C24;
-  --study-weak: #241640;
-  --growth-weak: #3A2C0A;
-  --danger-weak: #3A1620;
-  --ok-weak: #0F2C24;
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, .3);
-  --shadow-lg: 0 14px 40px rgba(0, 0, 0, .45);
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+
+  /* Ở dark mode --destructive/--success cố tình SÁNG (đọc tốt khi dùng làm CHỮ trên nền tối).
+     Khi dùng làm NỀN ĐẶC thì chữ phải TỐI → *-foreground đảo chiều so với light mode. */
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.16 0.04 25);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+
+  --success: oklch(0.696 0.17 162.48);
+  --success-foreground: oklch(0.16 0.03 163);
+  --warning: oklch(0.828 0.189 84.429);
+  --warning-foreground: oklch(0.216 0.045 70.08);
+
+  /* Nền tối → chữ mảng đời sống phải SÁNG hơn tint, ngược với light mode. */
+  --area-work-foreground: oklch(0.82 0.09 227.392);
+  --area-teach-foreground: oklch(0.84 0.13 162.48);
+  --area-study-foreground: oklch(0.82 0.13 264.376);
+  --area-growth-foreground: oklch(0.88 0.13 84.429);
 }

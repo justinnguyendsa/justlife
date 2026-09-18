@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hasValidConsent, getIsMinor } from "@/lib/lms/consent";
+import { auth } from "@/auth";
 import { eq } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import { tcAssignment, tcSubmission } from "@/db/lms/schema";
@@ -36,6 +38,12 @@ export async function POST(req: NextRequest) {
   // 1) Auth bắt buộc — studentId TỪ session (nguồn duy nhất).
   const studentId = await getSessionStudentId();
   if (!studentId) return err("Bạn cần đăng nhập để nộp bài.", 401);
+
+  // Consent enforcement (P-LMS-0): API-level gate, không chỉ UI.
+  const session = await auth();
+  const isMinor = session?.isMinor ?? await getIsMinor(studentId);
+  const consented = await hasValidConsent(studentId, isMinor);
+  if (!consented) return err("Bạn cần hoàn tất đồng ý xử lý dữ liệu trước khi nộp bài.", 403);
 
   // 2) Parse form.
   let form: FormData;

@@ -14,9 +14,6 @@ import type { NextAuthConfig } from "next-auth";
 // Owner-auth BẬT khi có cấu hình Google + OWNER_EMAIL → tức môi trường cloud/production.
 // KHÔNG có cấu hình này (máy local của Minh) → coi như tắt → vào thẳng, DX cũ giữ nguyên.
 export function ownerAuthEnabledEnv(): boolean {
-  // DISABLE_OWNER_AUTH=1 → bypass tạm (dùng khi chưa có Google OAuth key).
-  // Xóa biến này trên Vercel để bật lại bảo vệ. KHÔNG commit giá trị =1 vào .env prod.
-  if (process.env.DISABLE_OWNER_AUTH) return false;
   return Boolean(process.env.AUTH_GOOGLE_ID && process.env.OWNER_EMAIL);
 }
 
@@ -26,11 +23,16 @@ export function ownerAuthEnabledEnv(): boolean {
 //  - /api/auth         : endpoint nội bộ Auth.js (signin/callback/csrf…)
 //  - /share            : LINK CHIA SẺ công khai (tài liệu gửi người ngoài) — không được khoá
 //  - /api/library/file : phục vụ file cho link chia sẻ ở trên (dùng chung) — phải mở
-const ALWAYS_PUBLIC_PREFIXES = ["/api/auth", "/share/", "/api/library/file", "/api/debug-auth"];
+const ALWAYS_PUBLIC_PREFIXES = ["/api/auth", "/share/", "/api/library/file"];
 const ALWAYS_PUBLIC_EXACT = ["/login", "/portal/login"];
+
+// /ui-kit: trang tham chiếu design system, CHỈ mở ở dev. Ở production route này
+// đã tự trả 404 (xem src/app/ui-kit/page.tsx) nên không nới lỏng bảo mật thật.
+const DEV_ONLY_PUBLIC_EXACT = ["/ui-kit"];
 
 function isAlwaysPublic(path: string): boolean {
   if (ALWAYS_PUBLIC_EXACT.includes(path)) return true;
+  if (process.env.NODE_ENV !== "production" && DEV_ONLY_PUBLIC_EXACT.includes(path)) return true;
   return ALWAYS_PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
 }
 

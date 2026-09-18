@@ -1,16 +1,17 @@
 import { NextRequest } from "next/server";
+import { auth } from "@/auth";
+import { ownerAuthEnabledEnv } from "@/auth.config";
 import { getSubmissionById } from "@/db/teaching";
 import { readSubmission } from "@/lib/lms/storage";
 import { getExt, mimeForExt } from "@/lib/lms/upload-policy";
 import { logAccess } from "@/lib/lms/audit";
 
 // GET /api/teaching/submission/[id] — instructor (Minh) tải bài nộp để chấm.
-// Personal-side: khu /teaching là single-user (chỉ Minh, local). P5b sẽ bảo vệ instructor area
-// khi đưa lên internet (ADR-002 Q9). Hiện local Minh = tin cậy → không gắn auth học viên ở đây.
-// Vẫn cứng: attachment + nosniff (tải xuống, không tự mở) + Content-Type suy từ đuôi.
+// 🛡️ P-LMS-0: bảo vệ bằng owner-auth khi chạy cloud (ownerAuthEnabledEnv).
+// Local dev (không có Google cấu hình) → cho qua (DX cũ). attachment + nosniff giữ nguyên.
 //
 // 🗣️ Bình dân: route này để chính Minh tải bài học viên về máy chấm; vẫn tải-xuống an toàn
-//    (không mở thẳng trong trình duyệt). Bảo vệ bằng đăng nhập giảng viên sẽ thêm ở bản go-live.
+//    (không mở thẳng trong trình duyệt).
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+
+  // P-LMS-0: owner-auth cho route instructor khi chạy cloud.
+  if (ownerAuthEnabledEnv()) {
+    const session = await auth();
+    if (session?.role !== "owner") {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
 
   const sub = await getSubmissionById(id);
   if (!sub) return new Response("Không tìm thấy bài nộp.", { status: 404 });
