@@ -21,7 +21,11 @@ function authErrorMessage(code: string): string {
     case "AccessDenied":
       return "Tài khoản Google vừa dùng KHÔNG khớp OWNER_EMAIL → hãy đăng nhập đúng Gmail đã cấu hình (thử cửa sổ ẩn danh).";
     case "Configuration":
-      return "Lỗi cấu hình máy chủ (thiếu/sai biến: AUTH_SECRET / Google / OWNER_EMAIL).";
+      return "Lỗi cấu hình máy chủ: thiếu hoặc sai biến AUTH_SECRET / AUTH_GOOGLE_ID / OWNER_EMAIL trên môi trường này. Máy chủ đang khoá toàn bộ để an toàn.";
+    case "WrongRole":
+      return "Đã đăng nhập nhưng KHÔNG phải tài khoản chủ sở hữu. Kiểm tra OWNER_EMAIL có đúng bằng email Google vừa dùng không — lưu ý giá trị trên Vercel không được kèm ghi chú phía sau.";
+    case "SignedOut":
+      return "Phiên đăng nhập đã kết thúc hoặc chưa đăng nhập. Vui lòng đăng nhập lại.";
     case "OAuthSignin":
     case "OAuthCallback":
     case "OAuthCallbackError":
@@ -90,9 +94,9 @@ export default async function OwnerLoginPage({
                   marginTop: "var(--space-4)",
                   padding: "var(--space-3)",
                   borderRadius: "var(--radius-md)",
-                  background: "var(--danger-soft, #fdecea)",
-                  border: "1px solid var(--danger, #d92d20)",
-                  color: "var(--danger, #b42318)",
+                  background: "color-mix(in oklab, var(--destructive) 12%, var(--background))",
+                  border: "1px solid var(--destructive)",
+                  color: "var(--destructive)",
                   fontSize: 13,
                 }}
               >

@@ -1,4 +1,6 @@
 "use server";
+
+import { requireOwner } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { and, eq, asc, inArray } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
@@ -16,6 +18,8 @@ function refreshClass(id?: string) {
 
 // ===== Class =====
 export async function createClass(input: { name: string; term?: string }) {
+  await requireOwner();
+
   const id = genId();
   await lmsDb.insert(tcClass).values({ id, name: input.name, term: input.term ?? null, status: "active", createdAt: Date.now() });
   refreshClass();
@@ -24,6 +28,8 @@ export async function createClass(input: { name: string; term?: string }) {
 
 // Clone: copy assignment + roster học viên, KHÔNG copy điểm/điểm danh/buổi (chống copy-paste khi mở lớp mới).
 export async function cloneClass(fromId: string, input: { name: string; term?: string }) {
+  await requireOwner();
+
   const id = genId();
   const now = Date.now();
   await lmsDb.insert(tcClass).values({ id, name: input.name, term: input.term ?? null, status: "active", createdAt: now });
@@ -36,6 +42,8 @@ export async function cloneClass(fromId: string, input: { name: string; term?: s
 }
 
 export async function archiveClass(id: string) {
+  await requireOwner();
+
   await lmsDb.update(tcClass).set({ status: "archived" }).where(eq(tcClass.id, id));
   refreshClass(id);
   return { ok: true };
@@ -43,6 +51,8 @@ export async function archiveClass(id: string) {
 
 // ===== Students =====
 export async function addStudent(input: { classId: string; name: string; email?: string }) {
+  await requireOwner();
+
   await lmsDb.insert(tcStudent).values({ id: genId(), classId: input.classId, name: input.name, email: input.email ?? null, createdAt: Date.now() });
   refreshClass(input.classId);
   return { ok: true };
@@ -50,6 +60,8 @@ export async function addStudent(input: { classId: string; name: string; email?:
 // Xóa HV = CASCADE (S5): xóa SẠCH điểm/điểm danh/bài nộp(+file)/đồng ý/mã truy cập/lms_user/tc_student
 // trong 1 transaction — KHÔNG để mồ côi (R-JL-STUDENT-PII-01, AC-13). Audit ghi trong cascade.
 export async function removeStudent(id: string, classId: string) {
+  await requireOwner();
+
   await deleteStudentCascade(id, "instructor");
   refreshClass(classId);
   return { ok: true };
@@ -57,12 +69,16 @@ export async function removeStudent(id: string, classId: string) {
 
 // ===== Session + attendance =====
 export async function createSession(input: { classId: string; dateAt: number; topic?: string }) {
+  await requireOwner();
+
   const id = genId();
   await lmsDb.insert(tcSession).values({ id, classId: input.classId, dateAt: input.dateAt, topic: input.topic ?? null, createdAt: Date.now() });
   refreshClass(input.classId);
   return { ok: true, id };
 }
 export async function setAttendance(sessionId: string, classId: string, entries: { studentId: string; status: string }[]) {
+  await requireOwner();
+
   const now = Date.now();
   await lmsDb.delete(tcAttendance).where(eq(tcAttendance.sessionId, sessionId));
   for (const e of entries) await lmsDb.insert(tcAttendance).values({ id: genId(), sessionId, studentId: e.studentId, status: e.status, markedAt: now });
@@ -72,12 +88,16 @@ export async function setAttendance(sessionId: string, classId: string, entries:
 
 // ===== Assignment + grade =====
 export async function createAssignment(input: { classId: string; title: string; dueAt?: number | null; maxScore?: number; descriptionMd?: string | null }) {
+  await requireOwner();
+
   const id = genId();
   await lmsDb.insert(tcAssignment).values({ id, classId: input.classId, title: input.title, dueAt: input.dueAt ?? null, maxScore: input.maxScore ?? 10, descriptionMd: input.descriptionMd ?? null, createdAt: Date.now() });
   refreshClass(input.classId);
   return { ok: true, id };
 }
 export async function setGrade(input: { assignmentId: string; studentId: string; classId: string; score: number | null; feedback: string | null }) {
+  await requireOwner();
+
   const existing = (await lmsDb.select().from(tcGrade).where(and(eq(tcGrade.assignmentId, input.assignmentId), eq(tcGrade.studentId, input.studentId))).limit(1))[0];
   const now = Date.now();
   if (existing) {
@@ -93,6 +113,8 @@ export async function setGrade(input: { assignmentId: string; studentId: string;
 
 // ===== Update / Delete helpers =====
 export async function updateAssignment(id: string, input: { title?: string; dueAt?: number | null; maxScore?: number; descriptionMd?: string | null }) {
+  await requireOwner();
+
   await lmsDb.update(tcAssignment).set(input).where(eq(tcAssignment.id, id));
   // classId không biết trực tiếp → revalidate rộng
   revalidatePath("/teaching/classes", "layout");
@@ -100,6 +122,8 @@ export async function updateAssignment(id: string, input: { title?: string; dueA
 }
 
 export async function deleteSession(id: string, classId: string) {
+  await requireOwner();
+
   await lmsDb.delete(tcAttendance).where(eq(tcAttendance.sessionId, id));
   await lmsDb.delete(tcSession).where(eq(tcSession.id, id));
   refreshClass(classId);
@@ -107,6 +131,8 @@ export async function deleteSession(id: string, classId: string) {
 }
 
 export async function deleteAssignment(id: string, classId: string) {
+  await requireOwner();
+
   await lmsDb.delete(tcGrade).where(eq(tcGrade.assignmentId, id));
   await lmsDb.delete(tcAssignment).where(eq(tcAssignment.id, id));
   refreshClass(classId);
@@ -115,6 +141,8 @@ export async function deleteAssignment(id: string, classId: string) {
 
 // ===== Tài liệu lớp (P-LMS-1) — link/video ngay; upload file chờ object storage (P-LMS-0) =====
 export async function addMaterialLink(input: { classId: string; title: string; url: string }) {
+  await requireOwner();
+
   const title = input.title.trim();
   const url = input.url.trim();
   if (!title) return { ok: false, error: "Nhập tiêu đề tài liệu." };
@@ -144,6 +172,8 @@ export async function addMaterialLink(input: { classId: string; title: string; u
 }
 
 export async function deleteMaterial(id: string, classId: string) {
+  await requireOwner();
+
   const m = (await lmsDb.select().from(tcMaterial).where(eq(tcMaterial.id, id)).limit(1))[0];
   if (m?.fileRef) await deleteMaterialFile(m.fileRef); // xóa file đĩa nếu có (tài liệu dạng file)
   await lmsDb.delete(tcMaterial).where(eq(tcMaterial.id, id));
@@ -154,6 +184,8 @@ export async function deleteMaterial(id: string, classId: string) {
 
 /** P-LMS-1: Xuất điểm lớp ra CSV (UTF-8 BOM cho Excel). */
 export async function exportGradesCSV(classId: string): Promise<string> {
+  await requireOwner();
+
   const students = await lmsDb.select().from(tcStudent).where(eq(tcStudent.classId, classId)).orderBy(asc(tcStudent.name));
   const assignments = await lmsDb.select().from(tcAssignment).where(eq(tcAssignment.classId, classId)).orderBy(asc(tcAssignment.createdAt));
   const grades = await lmsDb.select().from(tcGrade).where(
@@ -189,6 +221,8 @@ export async function exportGradesCSV(classId: string): Promise<string> {
 
 /** P-LMS-1: Nhập học viên từ CSV. Mỗi dòng: tên, email (optional), ghi chú (optional). */
 export async function importStudentsCSV(classId: string, csvText: string): Promise<{ added: number; errors: string[] }> {
+  await requireOwner();
+
   const lines = csvText.split(/\r?\n/).filter(l => l.trim());
   // Skip header if it looks like one
   const start = lines[0]?.toLowerCase().includes("tên") || lines[0]?.toLowerCase().includes("name") ? 1 : 0;
@@ -220,6 +254,8 @@ export async function importStudentsCSV(classId: string, csvText: string): Promi
 // ===== P-LMS-2: Course Structure (module/lesson) =====
 
 export async function createModule(input: { courseId: string; title: string; descriptionMd?: string | null }) {
+  await requireOwner();
+
   // Determine next position
   const existing = await lmsDb.select({ position: tcModule.position }).from(tcModule)
     .where(eq(tcModule.courseId, input.courseId)).orderBy(asc(tcModule.position));
@@ -235,12 +271,16 @@ export async function createModule(input: { courseId: string; title: string; des
 }
 
 export async function updateModule(id: string, input: { title?: string; descriptionMd?: string | null; position?: number }) {
+  await requireOwner();
+
   await lmsDb.update(tcModule).set(input).where(eq(tcModule.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
 }
 
 export async function deleteModule(id: string) {
+  await requireOwner();
+
   // Cascade: xóa lessons trong module trước
   await lmsDb.delete(tcLesson).where(eq(tcLesson.moduleId, id));
   await lmsDb.delete(tcModule).where(eq(tcModule.id, id));
@@ -252,6 +292,8 @@ export async function createLesson(input: {
   moduleId: string; title: string; kind?: string;
   contentMd?: string | null; videoUrl?: string | null;
 }) {
+  await requireOwner();
+
   // Determine next position
   const existing = await lmsDb.select({ position: tcLesson.position }).from(tcLesson)
     .where(eq(tcLesson.moduleId, input.moduleId)).orderBy(asc(tcLesson.position));
@@ -272,12 +314,16 @@ export async function updateLesson(id: string, input: {
   title?: string; kind?: string; contentMd?: string | null;
   videoUrl?: string | null; position?: number;
 }) {
+  await requireOwner();
+
   await lmsDb.update(tcLesson).set(input).where(eq(tcLesson.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
 }
 
 export async function deleteLesson(id: string) {
+  await requireOwner();
+
   await lmsDb.delete(tcLesson).where(eq(tcLesson.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
@@ -285,6 +331,8 @@ export async function deleteLesson(id: string) {
 
 // ===== Course management =====
 export async function updateCourse(id: string, input: { title?: string; descriptionMd?: string | null; slug?: string; status?: string }) {
+  await requireOwner();
+
   await lmsDb.update(tcCourse).set(input).where(eq(tcCourse.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
@@ -296,6 +344,8 @@ export async function createQuestion(input: {
   courseId?: string | null; type: string; stemMd: string;
   choicesJson?: string | null; correctJson?: string | null; points?: number;
 }) {
+  await requireOwner();
+
   const id = genId();
   // correctJson: mã hóa at-rest nếu có key (QĐ2: KHÔNG gửi client)
   let encCorrect = input.correctJson ?? null;
@@ -316,6 +366,8 @@ export async function updateQuestion(id: string, input: {
   stemMd?: string; choicesJson?: string | null; correctJson?: string | null;
   points?: number; type?: string;
 }) {
+  await requireOwner();
+
   const updates: Record<string, unknown> = { ...input };
   if (input.correctJson !== undefined) {
     let enc = input.correctJson;
@@ -330,6 +382,8 @@ export async function updateQuestion(id: string, input: {
 }
 
 export async function deleteQuestion(id: string) {
+  await requireOwner();
+
   // Xóa liên kết trong quiz trước
   await lmsDb.delete(tcQuizQuestion).where(eq(tcQuizQuestion.questionId, id));
   await lmsDb.delete(tcQuestion).where(eq(tcQuestion.id, id));
@@ -342,6 +396,8 @@ export async function createQuiz(input: {
   timeLimitSec?: number | null; maxAttempts?: number;
   shuffle?: boolean; revealAfter?: boolean;
 }) {
+  await requireOwner();
+
   const id = genId();
   await lmsDb.insert(tcQuiz).values({
     id, courseId: input.courseId, lessonId: input.lessonId ?? null,
@@ -360,6 +416,8 @@ export async function updateQuiz(id: string, input: {
   title?: string; timeLimitSec?: number | null; maxAttempts?: number;
   shuffle?: boolean; revealAfter?: boolean; status?: string; lessonId?: string | null;
 }) {
+  await requireOwner();
+
   const updates: Record<string, unknown> = {};
   if (input.title !== undefined) updates.title = input.title;
   if (input.timeLimitSec !== undefined) updates.timeLimitSec = input.timeLimitSec;
@@ -374,6 +432,8 @@ export async function updateQuiz(id: string, input: {
 }
 
 export async function deleteQuiz(id: string) {
+  await requireOwner();
+
   // Cascade: attempts + quiz_questions + quiz
   await lmsDb.delete(tcQuizAttempt).where(eq(tcQuizAttempt.quizId, id));
   await lmsDb.delete(tcQuizQuestion).where(eq(tcQuizQuestion.quizId, id));
@@ -385,6 +445,8 @@ export async function deleteQuiz(id: string) {
 
 /** Thêm câu hỏi vào quiz. */
 export async function addQuestionToQuiz(quizId: string, questionId: string) {
+  await requireOwner();
+
   const existing = await lmsDb.select({ position: tcQuizQuestion.position }).from(tcQuizQuestion)
     .where(eq(tcQuizQuestion.quizId, quizId)).orderBy(asc(tcQuizQuestion.position));
   const nextPos = existing.length > 0 ? existing[existing.length - 1].position + 1 : 0;
@@ -397,6 +459,8 @@ export async function addQuestionToQuiz(quizId: string, questionId: string) {
 
 /** Xóa câu hỏi khỏi quiz. */
 export async function removeQuestionFromQuiz(quizId: string, questionId: string) {
+  await requireOwner();
+
   await lmsDb.delete(tcQuizQuestion).where(
     and(eq(tcQuizQuestion.quizId, quizId), eq(tcQuizQuestion.questionId, questionId)),
   );
@@ -407,6 +471,8 @@ export async function removeQuestionFromQuiz(quizId: string, questionId: string)
 // ===== P-LMS-5: Gradebook trọng số + Chứng chỉ =====
 
 export async function createGradeCategory(input: { courseId: string; name: string; weight?: number }) {
+  await requireOwner();
+
   const existing = await lmsDb.select({ position: tcGradeCategory.position }).from(tcGradeCategory)
     .where(eq(tcGradeCategory.courseId, input.courseId)).orderBy(asc(tcGradeCategory.position));
   const nextPos = existing.length > 0 ? existing[existing.length - 1].position + 1 : 0;
@@ -421,12 +487,16 @@ export async function createGradeCategory(input: { courseId: string; name: strin
 }
 
 export async function updateGradeCategory(id: string, input: { name?: string; weight?: number; position?: number }) {
+  await requireOwner();
+
   await lmsDb.update(tcGradeCategory).set(input).where(eq(tcGradeCategory.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
 }
 
 export async function deleteGradeCategory(id: string) {
+  await requireOwner();
+
   // Unlink assignments first (set categoryId = null)
   await lmsDb.update(tcAssignment).set({ categoryId: null }).where(eq(tcAssignment.categoryId, id));
   await lmsDb.delete(tcGradeCategory).where(eq(tcGradeCategory.id, id));
@@ -436,6 +506,8 @@ export async function deleteGradeCategory(id: string) {
 
 /** Cấp chứng chỉ cho học viên. */
 export async function issueCertificate(input: { personId: string; courseId: string; criteriaSnapshotJson?: string }) {
+  await requireOwner();
+
   const id = genId();
   // Generate random verify code (16 bytes = 128 bit, hex)
   const crypto = await import("crypto");
@@ -453,6 +525,8 @@ export async function issueCertificate(input: { personId: string; courseId: stri
 
 /** Thu hồi chứng chỉ. */
 export async function revokeCertificate(id: string) {
+  await requireOwner();
+
   await lmsDb.update(tcCertificate).set({ revoked: 1 }).where(eq(tcCertificate.id, id));
   await logAccess({ actor: "instructor", action: "revoke_certificate", targetType: "certificate", targetId: id });
   revalidatePath("/teaching/classes", "layout");
@@ -461,6 +535,8 @@ export async function revokeCertificate(id: string) {
 
 /** Tính điểm tổng kết theo trọng số nhóm. */
 export async function computeWeightedGrade(studentId: string, courseId: string) {
+  await requireOwner();
+
   // 1. Lấy categories của khóa
   const categories = await lmsDb.select().from(tcGradeCategory)
     .where(eq(tcGradeCategory.courseId, courseId));
@@ -510,6 +586,8 @@ export async function createCodeProblem(input: {
   statementMd: string; languagesJson?: string;
   timeLimitMs?: number; memLimitMb?: number; totalWeight?: number;
 }) {
+  await requireOwner();
+
   const id = genId();
   await lmsDb.insert(tcCodeProblem).values({
     id, courseId: input.courseId, lessonId: input.lessonId ?? null,
@@ -528,12 +606,16 @@ export async function updateCodeProblem(id: string, input: {
   title?: string; statementMd?: string; languagesJson?: string;
   timeLimitMs?: number; memLimitMb?: number; totalWeight?: number; status?: string;
 }) {
+  await requireOwner();
+
   await lmsDb.update(tcCodeProblem).set(input).where(eq(tcCodeProblem.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
 }
 
 export async function deleteCodeProblem(id: string) {
+  await requireOwner();
+
   // Cascade: runs -> submissions -> test cases -> problem
   const subs = await lmsDb.select({ id: tcCodeSubmission.id }).from(tcCodeSubmission)
     .where(eq(tcCodeSubmission.problemId, id));
@@ -551,6 +633,8 @@ export async function createTestCase(input: {
   problemId: string; input?: string | null; expectedOutput: string;
   isHidden?: boolean; weight?: number;
 }) {
+  await requireOwner();
+
   const existing = await lmsDb.select({ position: tcTestCase.position }).from(tcTestCase)
     .where(eq(tcTestCase.problemId, input.problemId)).orderBy(asc(tcTestCase.position));
   const nextPos = existing.length > 0 ? existing[existing.length - 1].position + 1 : 0;
@@ -574,6 +658,8 @@ export async function createTestCase(input: {
 }
 
 export async function deleteTestCase(id: string) {
+  await requireOwner();
+
   await lmsDb.delete(tcTestCase).where(eq(tcTestCase.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
@@ -583,6 +669,8 @@ export async function deleteTestCase(id: string) {
 
 /** Tạo mã tham gia lớp (self-enrol). */
 export async function createEnrolCode(input: { courseId: string; maxUses?: number | null; expiresAt?: number | null }) {
+  await requireOwner();
+
   const id = genId();
   // Mã ngắn 6 ký tự (A-Z, 0-9, loại ký tự nhầm lẫn O/0/I/1)
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -601,6 +689,8 @@ export async function createEnrolCode(input: { courseId: string; maxUses?: numbe
 
 /** Vô hiệu hóa mã tham gia. */
 export async function deactivateEnrolCode(id: string) {
+  await requireOwner();
+
   await lmsDb.update(classEnrolCode).set({ active: 0 }).where(eq(classEnrolCode.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
@@ -608,6 +698,8 @@ export async function deactivateEnrolCode(id: string) {
 
 /** Tạo thread (instructor). */
 export async function createThread(input: { courseId: string; lessonId?: string | null; title: string }) {
+  await requireOwner();
+
   const id = genId();
   await lmsDb.insert(tcThread).values({
     id, courseId: input.courseId, lessonId: input.lessonId ?? null,
@@ -621,6 +713,8 @@ export async function createThread(input: { courseId: string; lessonId?: string 
 
 /** Khóa/mở thread. */
 export async function toggleThreadLock(id: string, lock: boolean) {
+  await requireOwner();
+
   await lmsDb.update(tcThread).set({ status: lock ? "locked" : "open" }).where(eq(tcThread.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };
@@ -628,6 +722,8 @@ export async function toggleThreadLock(id: string, lock: boolean) {
 
 /** Trả lời thread (instructor). */
 export async function replyThread(input: { threadId: string; bodyMd: string; parentId?: string | null }) {
+  await requireOwner();
+
   const id = genId();
   await lmsDb.insert(tcPost).values({
     id, threadId: input.threadId,
@@ -642,6 +738,8 @@ export async function replyThread(input: { threadId: string; bodyMd: string; par
 
 /** Ẩn bài viết (kiểm duyệt: ẩn thay vì xóa cứng). */
 export async function hidePost(id: string) {
+  await requireOwner();
+
   await lmsDb.update(tcPost).set({ hidden: 1 }).where(eq(tcPost.id, id));
   await logAccess({ actor: "instructor", action: "hide_post", targetType: "post", targetId: id });
   revalidatePath("/teaching/classes", "layout");
@@ -650,6 +748,8 @@ export async function hidePost(id: string) {
 
 /** Unhide bài viết. */
 export async function unhidePost(id: string) {
+  await requireOwner();
+
   await lmsDb.update(tcPost).set({ hidden: 0 }).where(eq(tcPost.id, id));
   revalidatePath("/teaching/classes", "layout");
   return { ok: true };

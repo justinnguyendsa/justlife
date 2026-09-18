@@ -1,3 +1,4 @@
+import { denyIfNotOwner } from "@/lib/auth-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { libFile } from "@/db/schema";
@@ -9,6 +10,10 @@ export const runtime = "nodejs";
 const MAX = 25 * 1024 * 1024; // 25MB
 
 export async function POST(req: NextRequest) {
+  // P0-T03: gate chu so huu o TANG ROUTE (defense-in-depth, khong chi dua vao middleware).
+  const denied = await denyIfNotOwner();
+  if (denied) return denied;
+
   const form = await req.formData();
   const file = form.get("file");
   const folderId = (form.get("folderId") as string) || null;

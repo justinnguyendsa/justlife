@@ -1,3 +1,4 @@
+import { denyIfNotOwner } from "@/lib/auth-guard";
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { fixedSchedule } from "@/db/schema";
@@ -6,6 +7,10 @@ import { desc } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // P0-T03: gate chu so huu o TANG ROUTE (defense-in-depth, khong chi dua vao middleware).
+  const denied = await denyIfNotOwner();
+  if (denied) return denied;
+
   try {
     const schedules = await db
       .select()

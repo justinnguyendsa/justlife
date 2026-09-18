@@ -1,3 +1,4 @@
+import { denyIfNotOwner } from "@/lib/auth-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { task, deadline } from "@/db/schema";
@@ -22,6 +23,10 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // P0-T03: gate chu so huu o TANG ROUTE (defense-in-depth, khong chi dua vao middleware).
+  const denied = await denyIfNotOwner();
+  if (denied) return denied;
+
   try {
     const { id } = await params;
 

@@ -106,7 +106,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             console.error("[student-gmail-signin] error", e);
           }
         }
-        console.error("[owner-signin] REJECT — domain:", email?.split("@")[1] ?? "unknown");
+        // 🔎 P0-T01: chẩn đoán AN TOÀN cho log Vercel — CHỈ độ dài + cờ, KHÔNG email,
+        // KHÔNG domain (audit mục 5.3 yêu cầu bỏ domain khỏi log).
+        // Lý do cần: sự cố vừa rồi không chẩn đoán được vì không biết OWNER_EMAIL trên
+        // Vercel dài bao nhiêu. Nếu ownerEmailLen != attemptEmailLen mà match=false thì
+        // gần như chắc chắn giá trị env bị dính ghi chú/khoảng trắng phía sau.
+        console.error("[owner-signin] REJECT", {
+          match: owner === email,
+          attemptEmailLen: email?.length ?? 0,
+          ownerEmailLen: owner?.length ?? 0,
+          verified,
+        });
         return false; // người lạ / email chưa verify / học viên chưa liên kết → TỪ CHỐI
       }
       return true;

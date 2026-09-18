@@ -1,3 +1,4 @@
+import { denyIfNotOwner } from "@/lib/auth-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { task } from "@/db/schema";
@@ -6,6 +7,10 @@ import { and, asc, desc, eq, isNotNull, ne, sql } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  // P0-T03: gate chu so huu o TANG ROUTE (defense-in-depth, khong chi dua vao middleware).
+  const denied = await denyIfNotOwner();
+  if (denied) return denied;
+
   try {
     const { searchParams } = req.nextUrl;
     const status = searchParams.get("status") ?? "";

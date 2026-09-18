@@ -34,6 +34,23 @@ function err(msg: string, status = 400) {
 }
 
 export async function POST(req: NextRequest) {
+  // 🛡️ P0-T06: TẮT sau feature flag cho tới khi có sandbox thật (Piston trên VPS riêng).
+  // ADR-003 QĐ3 quy định P-LMS-4 chỉ được build SAU khi chủ dự án duyệt hạ tầng và
+  // privacy-auditor PASS — code đã ship trước gate đó. LocalJudge chạy code học viên
+  // KHÔNG sandbox (chỉ giới hạn thời gian), nên chỉ mở khi đặt tường minh:
+  //   CODE_JUDGE_ENABLED=1  +  CODE_JUDGE_ADAPTER=piston
+  //
+  // 🗣️ Bình dân: tính năng chấm code tạm khoá, vì chạy code người khác gửi lên mà không
+  //    nhốt vào "phòng cách ly" là rất nguy hiểm. Mở lại khi đã dựng phòng cách ly.
+  const judgeEnabled =
+    process.env.CODE_JUDGE_ENABLED === "1" && process.env.CODE_JUDGE_ADAPTER === "piston";
+  if (!judgeEnabled) {
+    return NextResponse.json(
+      { error: "Tính năng chấm code đang tạm khoá." },
+      { status: 503 },
+    );
+  }
+
   // 1. Auth
   const studentId = await getSessionStudentId();
   if (!studentId) return err("Chưa đăng nhập.", 401);

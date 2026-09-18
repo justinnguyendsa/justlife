@@ -51,7 +51,17 @@ export class LocalJudge implements CodeJudge {
       const proc = spawn(langConfig.cmd, langConfig.args(tmpFile), {
         timeout: req.timeLimitMs,
         stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env, NODE_ENV: "test" }, // Không leak production env
+        // 🛡️ P0-T06: KHÔNG truyền process.env cho tiến trình chạy code của học viên.
+        // Trước đây spread cả process.env (comment ghi "không leak" nhưng thực tế leak sạch):
+        // một dòng `print(os.environ)` trong bài nộp là lộ AUTH_SECRET, LMS_ENCRYPTION_KEY,
+        // LMS_INDEX_KEY, LMS_DATABASE_AUTH_TOKEN, AUTH_GOOGLE_SECRET.
+        // Chỉ giữ đúng những biến một runtime cần để khởi động.
+        env: {
+          NODE_ENV: "test",
+          PATH: process.env.PATH ?? "",
+          ...(process.env.SYSTEMROOT ? { SYSTEMROOT: process.env.SYSTEMROOT } : {}),
+          ...(process.env.TEMP ? { TEMP: process.env.TEMP } : {}),
+        },
       });
 
       let stdout = "";
