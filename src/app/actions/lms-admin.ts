@@ -1,4 +1,6 @@
 "use server";
+
+import { requireOwner } from "@/lib/auth-guard";
 import { eq } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import { tcStudent } from "@/db/lms/schema";
@@ -14,6 +16,8 @@ import { recordConsent } from "@/lib/lms/consent";
 //    Mã không lưu lại dạng gốc, mất thì cấp mã mới.
 
 export async function issueStudentAccessCode(studentId: string, classId: string) {
+  await requireOwner();
+
   if (!studentId || !classId) {
     return { ok: false as const, error: "Thiếu thông tin học viên/lớp." };
   }
@@ -53,6 +57,8 @@ export async function provisionStudentAccess(input: {
   isMinor: boolean;
   guardianContact?: string | null;
 }) {
+  await requireOwner();
+
   const { studentId, classId, isMinor } = input;
   if (!studentId || !classId) {
     return { ok: false as const, error: "Thiếu thông tin học viên/lớp." };

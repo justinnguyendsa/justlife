@@ -121,18 +121,63 @@ const STATEMENTS = [
 ];
 
 async function main() {
+  // Script KHÔNG tự nạp .env. Chạy trần = sửa FILE LOCAL, không phải Turso. In rõ đích đến
+  // để không bao giờ migrate nhầm DB rồi tưởng đã xong.
+  const target = process.env.LMS_DATABASE_URL || "file:lms.db";
+  const isRemote = target.startsWith("libsql:") || target.startsWith("https:");
+  console.log(
+    "Dich den: " + target.replace(/([?&](authToken|auth_token)=)[^&]+/gi, "$1***") +
+      (isRemote ? "   <<< REMOTE (Turso) >>>" : "   <<< FILE LOCAL tren may ban >>>"),
+  );
+  // ---- Kiểm tra trước khi chạy (chỉ với Turso) ----
+  // Sự cố 03/10: token dán vào PowerShell bị cắt cụt, mất phần chữ ký JWT → Turso trả
+  // "HTTP status 400" trần trụi, không ai đoán được là do token. Kiểm sớm để báo đúng bệnh.
+  if (isRemote) {
+    const token = process.env.LMS_DATABASE_AUTH_TOKEN ?? "";
+    const parts = token.split(".");
+    if (!token) {
+      throw new Error("Thiếu LMS_DATABASE_AUTH_TOKEN. Dùng `npm run db:lms:migrate:turso` để tự nạp từ .env.turso.local.");
+    }
+    if (parts.length !== 3 || parts.some((p) => !p)) {
+      throw new Error(
+        `Token Turso không hợp lệ: có ${parts.length} phần (JWT đúng phải có 3), dài ${token.length} ký tự. ` +
+          `Gần như chắc chắn bị cắt cụt khi dán vào terminal. ` +
+          `Dùng \`npm run db:lms:migrate:turso\` để tự nạp từ file thay vì dán tay.`,
+      );
+    }
+    try {
+      await lmsLibsql.execute("SELECT 1");
+    } catch (e) {
+      throw new Error(`Không kết nối được Turso (sai URL hoặc token hết quyền): ${String(e).slice(0, 160)}`);
+    }
+    console.log(`Kiểm tra kết nối: OK (token ${token.length} ký tự, 3 phần)`);
+  }
+
+  // ---- Chạy từng câu; lỗi thì nêu đích danh câu nào ----
+  let i = 0;
   for (const sql of STATEMENTS) {
+    i++;
     try {
       await lmsLibsql.execute(sql);
     } catch (e) {
-      // ALTER TABLE fails if column already exists — safe to ignore
-      if (String(e).includes('duplicate column') || String(e).includes('already exists')) {
-        continue;
+      // ALTER TABLE ADD COLUMN lỗi khi cột đã có — bỏ qua.
+      // ⚠ So chuỗi chỉ đáng tin với file local: qua HTTP, Turso có thể trả "HTTP 400" và
+      // thông báo gốc của SQLite bị mất. Nên với ALTER ta kiểm cột bằng PRAGMA thay vì đoán.
+      const msg = String(e);
+      if (msg.includes("duplicate column") || msg.includes("already exists")) continue;
+      const alter = sql.match(/^ALTER TABLE (\w+) ADD COLUMN (\w+)/i);
+      if (alter) {
+        const cols = (await lmsLibsql.execute(`PRAGMA table_info(${alter[1]})`)).rows.map((r) => String(r.name));
+        if (cols.includes(alter[2])) continue; // cột đã có thật → an toàn bỏ qua
       }
+      console.error(`
+❌ Lỗi ở câu ${i}/${STATEMENTS.length}:
+   ${sql.slice(0, 140)}${sql.length > 140 ? "…" : ""}
+`);
       throw e;
     }
   }
-  console.log("✓ migrate: tạo bảng xong (lms.db)");
+  console.log(`✓ migrate: tạo bảng xong — ${isRemote ? "Turso (remote)" : "file local"}`);
 }
 
 main().catch((e) => {

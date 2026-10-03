@@ -1,4 +1,6 @@
 "use server";
+
+import { requireOwner } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -17,6 +19,8 @@ async function conflictsFor(startAt: number, endAt: number, ignoreId?: string): 
 
 // Tạo time-block (xếp việc vào lịch). Cho phép tạo dù trùng (soft warn) — trả conflicts để UI cảnh báo.
 export async function createTimeBlock(input: { taskId?: string | null; title: string; startAt: number; endAt: number; area: string }) {
+  await requireOwner();
+
   const now = Date.now();
   const id = genId();
   const conflicts = await conflictsFor(input.startAt, input.endAt);
@@ -26,6 +30,8 @@ export async function createTimeBlock(input: { taskId?: string | null; title: st
 }
 
 export async function updateTimeBlock(id: string, startAt: number, endAt: number) {
+  await requireOwner();
+
   const conflicts = await conflictsFor(startAt, endAt, id);
   await db.update(timeBlock).set({ startAt, endAt }).where(eq(timeBlock.id, id));
   revalidatePath("/calendar"); revalidatePath("/today");
@@ -33,12 +39,16 @@ export async function updateTimeBlock(id: string, startAt: number, endAt: number
 }
 
 export async function deleteTimeBlock(id: string) {
+  await requireOwner();
+
   await db.delete(timeBlock).where(eq(timeBlock.id, id));
   revalidatePath("/calendar"); revalidatePath("/today");
   return { ok: true };
 }
 
 export async function addFixedSchedule(input: { label: string; area: string; startMin: number; endMin: number; weekdayMask: number }) {
+  await requireOwner();
+
   if (input.endMin <= input.startMin) return { ok: false, error: "Giờ kết thúc phải sau giờ bắt đầu" };
   await db.insert(fixedSchedule).values({ id: genId(), ...input, createdAt: Date.now() });
   revalidatePath("/settings"); revalidatePath("/calendar"); revalidatePath("/today");
@@ -46,6 +56,8 @@ export async function addFixedSchedule(input: { label: string; area: string; sta
 }
 
 export async function deleteFixedSchedule(id: string) {
+  await requireOwner();
+
   await db.delete(fixedSchedule).where(eq(fixedSchedule.id, id));
   revalidatePath("/settings"); revalidatePath("/calendar"); revalidatePath("/today");
   return { ok: true };
@@ -55,6 +67,8 @@ export async function updateFixedSchedule(
   id: string,
   input: { label?: string; area?: string; startMin?: number; endMin?: number; weekdayMask?: number }
 ) {
+  await requireOwner();
+
   if (input.startMin !== undefined && input.endMin !== undefined) {
     if (input.endMin <= input.startMin) return { ok: false, error: "Giờ kết thúc phải sau giờ bắt đầu" };
   }

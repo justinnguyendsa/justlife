@@ -1,3 +1,4 @@
+import { denyIfNotOwner } from "@/lib/auth-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { task, deadline } from "@/db/schema";
@@ -19,6 +20,10 @@ type DeadlineWithEffective = {
 };
 
 export async function GET(req: NextRequest) {
+  // P0-T03: gate chu so huu o TANG ROUTE (defense-in-depth, khong chi dua vao middleware).
+  const denied = await denyIfNotOwner();
+  if (denied) return denied;
+
   try {
     const { searchParams } = req.nextUrl;
     const windowDays = Math.max(1, parseInt(searchParams.get("window_days") ?? "7", 10));

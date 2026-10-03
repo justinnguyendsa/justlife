@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { ownerAuthEnabledEnv } from "@/auth.config";
+import { ownerAuthEnabledEnv, ownerAuthMisconfiguredInProd } from "@/auth.config";
 
 // 🛡️ Lớp gate CHỦ SỞ HỮU (server-side) cho Personal OS + khu Dạy học (P5b).
 // Dùng kèm middleware (defense-in-depth): middleware chặn ở Edge, các helper này chặn ở server
@@ -24,10 +24,16 @@ export function isOwnerAuthEnabled(): boolean {
  * Gọi ở đầu Server Component nhạy cảm nếu muốn chắc chắn (middleware vốn đã chặn lớp ngoài).
  */
 export async function requireOwner(): Promise<void> {
-  if (!isOwnerAuthEnabled()) return; // local dev → mở
+  // Production mà thiếu cấu hình owner → CHẶN, không phải mở (nhất quán với denyIfNotOwner).
+  // Nếu để `return` ở đây thì cả 88 guard vừa gắn đều thành vô tác dụng trong đúng kịch bản
+  // mà fail-closed sinh ra để chống.
+  if (ownerAuthMisconfiguredInProd()) {
+    redirect("/login?error=Configuration");
+  }
+  if (!isOwnerAuthEnabled()) return; // máy local (không phải production) → mở, giữ DX cũ
   const session = await auth();
   if (session?.role !== "owner") {
-    redirect("/login");
+    redirect("/login?error=WrongRole");
   }
 }
 
@@ -41,4 +47,29 @@ export async function getOwnerSession() {
   if (!isOwnerAuthEnabled()) return null;
   const session = await auth();
   return session?.role === "owner" ? session : null;
+}
+
+/**
+ * 🛡️ Gate CHỦ SỞ HỮU cho ROUTE HANDLER (P0-T03).
+ *
+ * Khác `requireOwner()`: route handler KHÔNG được redirect sang trang HTML — client gọi API
+ * cần một mã trạng thái để xử lý. Hàm này trả về `Response` khi phải chặn, `null` khi cho qua.
+ *
+ * Dùng:  `const denied = await denyIfNotOwner(); if (denied) return denied;`
+ *
+ * Quy tắc:
+ *  - production mà thiếu cấu hình owner → 503 (fail-closed, xem ownerAuthMisconfiguredInProd).
+ *  - owner-auth tắt ở máy local → cho qua (giữ DX cũ).
+ *  - có bật mà không phải owner → 401.
+ *
+ * 🗣️ Bình dân: người gác cửa dành cho API — không đẩy sang trang đăng nhập, chỉ trả lời "không được vào".
+ */
+export async function denyIfNotOwner(): Promise<Response | null> {
+  if (ownerAuthMisconfiguredInProd()) {
+    return Response.json({ error: "server_misconfigured" }, { status: 503 });
+  }
+  if (!isOwnerAuthEnabled()) return null; // local dev → mở
+  const session = await auth();
+  if (session?.role === "owner") return null;
+  return Response.json({ error: "unauthorized" }, { status: 401 });
 }

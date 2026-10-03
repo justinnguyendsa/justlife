@@ -1,4 +1,6 @@
 "use server";
+
+import { requireOwner } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -12,12 +14,16 @@ function refresh(courseId?: string) {
 
 // ===== Course =====
 export async function createCourse(input: { name: string; code?: string; term?: string }) {
+  await requireOwner();
+
   const id = genId();
   await db.insert(stCourse).values({ id, name: input.name, code: input.code ?? null, term: input.term ?? null, createdAt: Date.now() });
   refresh();
   return { ok: true, id };
 }
 export async function deleteCourse(id: string) {
+  await requireOwner();
+
   await db.delete(stItem).where(eq(stItem.courseId, id));
   await db.delete(stNote).where(eq(stNote.courseId, id));
   await db.delete(stCourse).where(eq(stCourse.id, id));
@@ -27,16 +33,22 @@ export async function deleteCourse(id: string) {
 
 // ===== Item (bài tập/đồ án/quiz/thi) =====
 export async function createItem(input: { courseId: string; title: string; kind: string; dueAt?: number | null }) {
+  await requireOwner();
+
   await db.insert(stItem).values({ id: genId(), courseId: input.courseId, title: input.title, kind: input.kind, dueAt: input.dueAt ?? null, status: "todo", createdAt: Date.now() });
   refresh(input.courseId);
   return { ok: true };
 }
 export async function setItemStatus(id: string, courseId: string, status: string) {
+  await requireOwner();
+
   await db.update(stItem).set({ status, doneAt: status === "done" ? Date.now() : null }).where(eq(stItem.id, id));
   refresh(courseId);
   return { ok: true };
 }
 export async function deleteItem(id: string, courseId: string) {
+  await requireOwner();
+
   await db.delete(stItem).where(eq(stItem.id, id));
   refresh(courseId);
   return { ok: true };
@@ -44,11 +56,15 @@ export async function deleteItem(id: string, courseId: string) {
 
 // ===== Note / tài liệu =====
 export async function createNote(input: { courseId: string; title: string; body?: string; url?: string }) {
+  await requireOwner();
+
   await db.insert(stNote).values({ id: genId(), courseId: input.courseId, title: input.title, body: input.body ?? null, url: input.url ?? null, createdAt: Date.now() });
   refresh(input.courseId);
   return { ok: true };
 }
 export async function deleteNote(id: string, courseId: string) {
+  await requireOwner();
+
   await db.delete(stNote).where(eq(stNote.id, id));
   refresh(courseId);
   return { ok: true };

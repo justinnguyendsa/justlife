@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/auth";
-import { ownerAuthEnabledEnv } from "@/auth.config";
+import { denyIfNotOwner } from "@/lib/auth-guard";
 import { getSubmissionById } from "@/db/teaching";
 import { readSubmission } from "@/lib/lms/storage";
 import { getExt, mimeForExt } from "@/lib/lms/upload-policy";
@@ -21,16 +20,11 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  // P-LMS-0: owner-auth cho route instructor khi chạy cloud.
-  if (ownerAuthEnabledEnv()) {
-    const session = await auth();
-    if (session?.role !== "owner") {
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-  }
+  // P0: dùng chung denyIfNotOwner() cho nhất quán (fail-closed ở production khi thiếu env).
+  // Bản cũ dùng ownerAuthEnabledEnv() trực tiếp → thiếu env là BỎ QUA kiểm tra, trong khi
+  // route này phục vụ FILE BÀI NỘP của học viên (PII).
+  const denied = await denyIfNotOwner();
+  if (denied) return denied;
 
   const sub = await getSubmissionById(id);
   if (!sub) return new Response("Không tìm thấy bài nộp.", { status: 404 });

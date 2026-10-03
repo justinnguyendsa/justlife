@@ -1,4 +1,6 @@
 "use server";
+
+import { requireOwner } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -9,6 +11,8 @@ import { deleteStored } from "@/lib/storage";
 const refresh = () => revalidatePath("/library");
 
 export async function createFolder(input: { name: string; parentId?: string | null }) {
+  await requireOwner();
+
   if (!input.name.trim()) return { ok: false };
   await db.insert(libFolder).values({ id: genId(), name: input.name.trim(), parentId: input.parentId ?? null, createdAt: Date.now() });
   refresh();
@@ -16,6 +20,8 @@ export async function createFolder(input: { name: string; parentId?: string | nu
 }
 
 export async function deleteFolder(id: string) {
+  await requireOwner();
+
   async function rec(fid: string) {
     const subs = await db.select().from(libFolder).where(eq(libFolder.parentId, fid));
     for (const s of subs) await rec(s.id);
@@ -32,6 +38,8 @@ export async function deleteFolder(id: string) {
 }
 
 export async function addLink(input: { folderId?: string | null; name: string; url: string; linkClassId?: string; linkCourseId?: string }) {
+  await requireOwner();
+
   await db.insert(libFile).values({
     id: genId(), folderId: input.folderId ?? null, name: input.name.trim(), kind: "link", url: input.url.trim(),
     linkClassId: input.linkClassId ?? null, linkCourseId: input.linkCourseId ?? null, createdAt: Date.now(),
@@ -41,6 +49,8 @@ export async function addLink(input: { folderId?: string | null; name: string; u
 }
 
 export async function deleteFile(id: string) {
+  await requireOwner();
+
   const f = (await db.select().from(libFile).where(eq(libFile.id, id)).limit(1))[0];
   if (f?.kind === "upload" && f.storedName) await deleteStored(f.storedName);
   await db.delete(libFile).where(eq(libFile.id, id));
@@ -50,6 +60,8 @@ export async function deleteFile(id: string) {
 
 // Bật/tắt chia sẻ. Trả về shareId mới (hoặc null nếu tắt).
 export async function toggleShareFolder(id: string) {
+  await requireOwner();
+
   const row = (await db.select().from(libFolder).where(eq(libFolder.id, id)).limit(1))[0];
   if (!row) return { ok: false };
   const shareId = row.shareId ? null : genShortId();
@@ -58,6 +70,8 @@ export async function toggleShareFolder(id: string) {
   return { ok: true, shareId };
 }
 export async function toggleShareFile(id: string) {
+  await requireOwner();
+
   const row = (await db.select().from(libFile).where(eq(libFile.id, id)).limit(1))[0];
   if (!row) return { ok: false };
   const shareId = row.shareId ? null : genShortId();
@@ -68,6 +82,8 @@ export async function toggleShareFile(id: string) {
 
 // Gắn file với lớp (dạy) / môn (học) — chuẩn bị chia sẻ cho lớp ở P5.
 export async function assignFile(input: { fileId: string; classId?: string | null; courseId?: string | null }) {
+  await requireOwner();
+
   await db.update(libFile).set({ linkClassId: input.classId ?? null, linkCourseId: input.courseId ?? null }).where(eq(libFile.id, input.fileId));
   refresh();
   return { ok: true };

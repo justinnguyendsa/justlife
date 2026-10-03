@@ -95,6 +95,7 @@ git remote add origin <repo-url> && git push -u origin main
 
 ## Bước 7 — Trước khi nhận học viên THẬT (privacy gate)
 - [ ] 🔧 Owner-auth đã chặn Personal + /teaching (test: ẩn danh không vào được).
+- [x] **Đã gỡ endpoint chẩn đoán tạm** `/api/debug-auth` (chỉ bảo vệ bằng token cố định `jl-dbg-7e02f205` đã lộ trong git history) — xóa route + bỏ khỏi `ALWAYS_PUBLIC_PREFIXES`; endpoint này từng lộ domain `OWNER_EMAIL`, độ dài `AUTH_SECRET`, tên cookie phiên, và lần thử đăng nhập gần nhất (in-memory).
 - [ ] 🔧 File bài nộp/thư viện lên object storage (không mất khi redeploy).
 - [ ] 🔧 Field định danh đã mã hóa trên Turso.
 - [ ] Google login chỉ cho email đã được cấp vào lớp.

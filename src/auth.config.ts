@@ -17,6 +17,20 @@ export function ownerAuthEnabledEnv(): boolean {
   return Boolean(process.env.AUTH_GOOGLE_ID && process.env.OWNER_EMAIL);
 }
 
+/**
+ * 🛡️ FAIL-CLOSED (P0-T02). Ở production mà THIẾU cấu hình owner → coi như "đã bật và chặn",
+ * KHÔNG phải "tắt và mở toang".
+ *
+ * Trước đây thiếu 1 biến env là `ownerAuthEnabledEnv()` trả false → `authorized()` cho qua TẤT CẢ,
+ * im lặng, không log. Gõ sai/xoá nhầm OWNER_EMAIL trên Vercel = mở toàn bộ Personal OS ra Internet.
+ * Cùng lớp lỗi với cờ DISABLE_OWNER_AUTH đã gỡ — chỉ đổi từ "bật cờ" sang "quên set".
+ *
+ * 🗣️ Bình dân: khoá hỏng thì chốt cửa lại, không phải mở toang cửa.
+ */
+export function ownerAuthMisconfiguredInProd(): boolean {
+  return process.env.NODE_ENV === "production" && !ownerAuthEnabledEnv();
+}
+
 // Các tiền tố LUÔN public — kể cả khi owner-auth bật (chống tự khoá cổng học viên / link chia sẻ).
 //  - /login            : trang đăng nhập chủ sở hữu
 //  - /portal/login     : cổng học viên (student-auth tự xử trong nhánh isPortal)
@@ -33,7 +47,9 @@ const DEV_ONLY_PUBLIC_EXACT = ["/ui-kit"];
 function isAlwaysPublic(path: string): boolean {
   if (ALWAYS_PUBLIC_EXACT.includes(path)) return true;
   if (process.env.NODE_ENV !== "production" && DEV_ONLY_PUBLIC_EXACT.includes(path)) return true;
-  return ALWAYS_PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p));
+  // Khớp theo RANH GIỚI đoạn đường dẫn, không phải khớp chuỗi trần:
+  // "/api/library/file" KHÔNG được vô tình mở cho "/api/library/file-admin".
+  return ALWAYS_PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : p + "/"));
 }
 
 // API nào? (chưa-auth → trả 401 thay vì redirect — đúng chuẩn cho client gọi API)
@@ -103,16 +119,32 @@ export const authConfig = {
         return auth?.role === "student";
       }
 
-      // 2) Ngoài /portal: nếu owner-auth TẮT (local dev) → cho qua tất cả (giữ DX hiện tại).
-      if (!ownerAuthEnabledEnv()) return true;
-
-      // 3) owner-auth BẬT (cloud): các route luôn-public vẫn cho qua.
-      if (isAlwaysPublic(path)) return true;
-
-      // 3b) Học viên đã đăng nhập được phép gọi API LMS của CHÍNH MÌNH (route tự scope theo studentId).
+      // 2) API của HỌC VIÊN — xét TRƯỚC nhánh fail-closed bên dưới.
+      //    Student-auth chỉ cần AUTH_SECRET, KHÔNG liên quan gì tới OWNER_EMAIL/AUTH_GOOGLE_ID.
+      //    Nếu để sau, chủ dự án gõ sai biến của mình là học viên mất luôn khả năng nộp bài
+      //    và tải tài liệu — phạt nhầm người.
       if (path.startsWith("/api/lms/") && auth?.role === "student") return true;
 
-      // 4) Còn lại (Personal OS + Dạy học + API tương ứng) → yêu cầu role owner.
+      // 3) Ngoài /portal, ở PRODUCTION mà thiếu cấu hình owner → FAIL-CLOSED (P0-T02):
+      //    chặn hết trừ route luôn-public. Thà app không dùng được còn hơn mở toang.
+      if (ownerAuthMisconfiguredInProd()) {
+        if (isAlwaysPublic(path)) return true;
+        if (isApiPath(path)) {
+          return Response.json({ error: "server_misconfigured" }, { status: 503 });
+        }
+        const url = new URL("/login", request.nextUrl.origin);
+        url.searchParams.set("error", "Configuration");
+        return Response.redirect(url);
+      }
+
+      // 4) Ngoài /portal: owner-auth TẮT ở môi trường KHÔNG phải production (máy local)
+      //    → cho qua tất cả, giữ DX cũ.
+      if (!ownerAuthEnabledEnv()) return true;
+
+      // 5) owner-auth BẬT (cloud): các route luôn-public vẫn cho qua.
+      if (isAlwaysPublic(path)) return true;
+
+      // 6) Còn lại (Personal OS + Dạy học + API tương ứng) → yêu cầu role owner.
       if (auth?.role === "owner") return true;
 
       // Chưa phải owner:
@@ -120,8 +152,14 @@ export const authConfig = {
       if (isApiPath(path)) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
-      //  - Trang → redirect về /login (trang đăng nhập chủ sở hữu).
+      //  - Trang → redirect về /login KÈM mã lỗi (P0-T07).
+      //    Trước đây redirect trần không có ?error= → đăng nhập xong bị đá về trang login
+      //    mà KHÔNG hiện lý do gì. Đây chính là triệu chứng "không đăng nhập được, không báo lỗi".
+      //    Phân biệt 2 trường hợp để báo đúng bệnh:
+      //      - đã có phiên nhưng sai vai (vd role=student)  → WrongRole
+      //      - chưa đăng nhập                               → SignedOut
       const loginUrl = new URL("/login", request.nextUrl.origin);
+      loginUrl.searchParams.set("error", auth?.role ? "WrongRole" : "SignedOut");
       return Response.redirect(loginUrl);
     },
   },

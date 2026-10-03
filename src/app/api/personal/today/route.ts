@@ -1,3 +1,4 @@
+import { denyIfNotOwner } from "@/lib/auth-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { task, deadline, timeBlock } from "@/db/schema";
@@ -26,6 +27,10 @@ function parseDateParam(dateStr: string): number {
 }
 
 export async function GET(req: NextRequest) {
+  // P0-T03: gate chu so huu o TANG ROUTE (defense-in-depth, khong chi dua vao middleware).
+  const denied = await denyIfNotOwner();
+  if (denied) return denied;
+
   try {
     const { searchParams } = req.nextUrl;
     const dateParam = searchParams.get("date");

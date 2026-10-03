@@ -1,4 +1,6 @@
 "use server";
+
+import { requireOwner } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { eq, and, ne, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -54,6 +56,8 @@ export async function createTask(input: {
   effort: number | null;
   impact: number | null;
 }) {
+  await requireOwner();
+
   const now = Date.now();
   const id = genId();
   await db.insert(task).values({
@@ -95,6 +99,8 @@ export async function updateTask(
     deadlineAt?: number | null;
   }
 ) {
+  await requireOwner();
+
   const now = Date.now();
 
   // Validate title nếu được truyền vào
@@ -159,6 +165,8 @@ export async function updateTaskPriority(
   id: string,
   input: { effort: number; impact: number; deadlineAt?: number | null }
 ) {
+  await requireOwner();
+
   const now = Date.now();
   const cur = (await db.select().from(task).where(eq(task.id, id)).limit(1))[0];
   if (!cur) return { ok: false };
@@ -188,6 +196,8 @@ export async function updateTaskPriority(
 // ─── SET STATUS (với WIP check) ────────────────────────────────────────────────
 
 export async function setTaskStatus(id: string, status: string) {
+  await requireOwner();
+
   const now = Date.now();
 
   if (status === "doing") {
@@ -209,6 +219,8 @@ export async function setTaskStatus(id: string, status: string) {
 // ─── DELETE ───────────────────────────────────────────────────────────────────
 
 export async function deleteTask(id: string) {
+  await requireOwner();
+
   const cur = (await db.select({ id: task.id }).from(task).where(eq(task.id, id)).limit(1))[0];
   if (!cur) return { ok: false, error: "Không tìm thấy việc" };
 
@@ -222,6 +234,8 @@ export async function deleteTask(id: string) {
 // ─── ARCHIVE ──────────────────────────────────────────────────────────────────
 
 export async function archiveTask(id: string) {
+  await requireOwner();
+
   const now = Date.now();
   await db
     .update(task)

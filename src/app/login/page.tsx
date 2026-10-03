@@ -19,9 +19,13 @@ export const metadata: Metadata = {
 function authErrorMessage(code: string): string {
   switch (code) {
     case "AccessDenied":
-      return "Tài khoản Google vừa dùng KHÔNG khớp OWNER_EMAIL → hãy đăng nhập đúng Gmail đã cấu hình (thử cửa sổ ẩn danh).";
+      return "Tài khoản Google vừa dùng không có quyền truy cập. Hãy đăng nhập đúng tài khoản chủ sở hữu (thử cửa sổ ẩn danh nếu trình duyệt đang nhớ tài khoản khác).";
     case "Configuration":
-      return "Lỗi cấu hình máy chủ (thiếu/sai biến: AUTH_SECRET / Google / OWNER_EMAIL).";
+      return "Máy chủ chưa được cấu hình đúng nên đang tạm khoá toàn bộ để an toàn. Kiểm tra biến môi trường xác thực trên môi trường này (chi tiết nằm trong log máy chủ).";
+    case "WrongRole":
+      return "Đã đăng nhập nhưng tài khoản này không có quyền chủ sở hữu. Nếu đây là tài khoản của bạn, đối chiếu độ dài email trong log máy chủ — giá trị cấu hình có thể bị dính khoảng trắng hoặc ghi chú phía sau.";
+    case "SignedOut":
+      return "Phiên đăng nhập đã kết thúc hoặc chưa đăng nhập. Vui lòng đăng nhập lại.";
     case "OAuthSignin":
     case "OAuthCallback":
     case "OAuthCallbackError":
@@ -90,9 +94,9 @@ export default async function OwnerLoginPage({
                   marginTop: "var(--space-4)",
                   padding: "var(--space-3)",
                   borderRadius: "var(--radius-md)",
-                  background: "var(--danger-soft, #fdecea)",
-                  border: "1px solid var(--danger, #d92d20)",
-                  color: "var(--danger, #b42318)",
+                  background: "color-mix(in oklab, var(--destructive) 12%, var(--background))",
+                  border: "1px solid var(--destructive)",
+                  color: "var(--destructive)",
                   fontSize: 13,
                 }}
               >
