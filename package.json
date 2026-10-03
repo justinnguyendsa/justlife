@@ -14,7 +14,9 @@
     "db:lms:migrate": "tsx src/db/lms/migrate.ts",
     "db:lms:seed": "tsx src/db/lms/seed.ts",
     "test": "vitest run",
-    "db:lms:check": "tsx src/db/lms/check-drift.ts"
+    "db:lms:check": "tsx src/db/lms/check-drift.ts",
+    "db:lms:migrate:turso": "tsx --env-file=.env.turso.local src/db/lms/migrate.ts",
+    "db:lms:check:turso": "tsx --env-file=.env.turso.local src/db/lms/check-drift.ts"
   },
   "dependencies": {
     "@auth/core": "0.41.2",

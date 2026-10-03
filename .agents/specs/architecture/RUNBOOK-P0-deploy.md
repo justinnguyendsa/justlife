@@ -105,60 +105,36 @@ tác forum và mã tự ghi danh sẽ lỗi lúc chạy.
 > file `lms.db` trên máy bạn chứ **không** phải Turso. Vì vậy phải truyền biến vào lệnh.
 > Script giờ in rõ đích đến ở dòng đầu — **luôn đọc dòng đó trước khi tin kết quả**.
 
-### C1. Lấy thông tin Turso
+### C1. Chạy migration — KHÔNG dán token tay
 
-Giá trị đã có sẵn trong file `.env.turso.local` ở thư mục dự án (file này không lên git):
-
-- `LMS_DATABASE_URL` — dạng `libsql://<tên-db>.turso.io`
-- `LMS_DATABASE_AUTH_TOKEN` — chuỗi dài
-
-### C2. Chạy migration (PowerShell — shell mặc định trên máy bạn)
-
-Mở PowerShell tại thư mục dự án, chạy **từng khối một**:
+Script tự nạp thông tin từ file `.env.turso.local` (đã có sẵn, không lên git):
 
 ```powershell
-$env:LMS_DATABASE_URL = "libsql://<dien-ten-db>.turso.io"
-$env:LMS_DATABASE_AUTH_TOKEN = "<dien-token>"
-npm run db:lms:migrate
+npm run db:lms:migrate:turso
 ```
 
-**Dòng đầu output phải là:**
+Kết quả đúng phải có đủ 3 dòng:
 
 ```
-Dich den: libsql://<ten-db>.turso.io   <<< REMOTE (Turso) >>>
+Dich den: libsql://justlife-lms-....turso.io   <<< REMOTE (Turso) >>>
+Kiểm tra kết nối: OK (token 279 ký tự, 3 phần)
+✓ migrate: tạo bảng xong — Turso (remote)
 ```
 
-Nếu thấy `<<< FILE LOCAL tren may ban >>>` thì biến chưa được nhận — dừng lại, kiểm tra
-lại hai lệnh `$env:` phía trên.
+> ⚠️ **Đừng dán token vào PowerShell.** Lần chạy 03/10 bị `HTTP status 400` vì token
+> 279 ký tự bị PowerShell cắt còn ~130 ký tự khi dán (mất phần chữ ký JWT). Turso không
+> đọc được nên trả 400 — một thông báo không gợi ý gì về nguyên nhân thật.
+> Script giờ kiểm token trước khi chạy và báo rõ nếu bị cắt.
 
-### C3. Kiểm chứng C
+### C2. Kiểm chứng
 
 ```powershell
-npm run db:lms:check
+npm run db:lms:check:turso
 ```
 
-Kết quả đúng:
+Kết quả đúng: `Bảng có thật trong DB : 32` và `✓ Không lệch`.
 
-```
-Dang kiem: libsql://<ten-db>.turso.io   <<< REMOTE (Turso) >>>
-
-Bảng khai trong schema.ts : 32
-Bảng có thật trong DB     : 32
-
-✓ Không lệch: mọi bảng khai trong schema đều có trong DB.
-```
-
-Nếu báo `❌ LỆCH SCHEMA` kèm danh sách bảng thiếu → chạy lại C2.
-
-### C4. Dọn biến khỏi phiên PowerShell
-
-Làm xong nhớ xoá, tránh các lệnh sau vô tình chạy vào Turso:
-
-```powershell
-Remove-Item Env:LMS_DATABASE_URL, Env:LMS_DATABASE_AUTH_TOKEN
-```
-
----
+> Đã xác nhận 03/10: Turso đủ **32/32 bảng** và **6/6 cột** bổ sung.
 
 ## D. Sau khi xong A, B, C
 
