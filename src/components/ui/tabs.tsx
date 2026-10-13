@@ -4,9 +4,9 @@ import * as React from "react";
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 
 import { cn } from "@/lib/utils";
+import { type WithClassName } from "./shared";
 
 // Tab (ADR-005 3c.3 — Base UI): Trigger → Tab, Content → Panel, mục đang chọn có data-active.
-type WithClassName<P> = Omit<P, "className"> & { className?: string };
 
 function Tabs({ className, ...props }: WithClassName<TabsPrimitive.Root.Props>) {
   return <TabsPrimitive.Root data-slot="tabs" className={cn("flex flex-col gap-2", className)} {...props} />;

@@ -5,12 +5,12 @@ import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { type WithClassName } from "./shared";
 
 // Select (ADR-005 3c.3 — Base UI). Khác Radix:
 //  - Truyền `items` cho <Select> để <SelectValue> hiện nhãn (không có thì hiện giá trị thô).
 //  - Content tách Portal → Positioner → Popup → List; biến --anchor-width / --available-height.
 //  - Mặc định xổ xuống dưới nút (alignItemWithTrigger=false) như position="popper" cũ.
-type WithClassName<P> = Omit<P, "className"> & { className?: string };
 
 const Select = SelectPrimitive.Root;
 
