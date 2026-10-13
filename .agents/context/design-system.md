@@ -61,7 +61,18 @@ Utility Tailwind dùng được, ví dụ:
 | Học | `--area-study` (tím) | |
 | Bản thân | `--area-growth` (hổ phách) | |
 
-## 3. Thành phần (`src/components/ui/*`, shadcn new-york)
+## 3. Thành phần (`src/components/ui/*`, shadcn trên **Base UI** — ADR-005 3c, 14/10/2026)
+
+**Luật dùng primitive (Base UI, không còn Radix):**
+- **Không có `asChild`.** Muốn đổi thẻ gốc thì dùng prop `render` (vd. `<DialogTrigger render={<Button variant="outline" />}>Mở</DialogTrigger>`).
+- **Link trông như nút:** `<Link className={cn(buttonVariants({ variant, size }), "...")}>` — KHÔNG bọc `<Link>` trong `<Button>` (Base UI Button luôn đặt `role="button"`).
+- **Button mặc định `type="button"`.** Nút gửi form PHẢI ghi `type="submit"`.
+- **Thuộc tính trạng thái** trong class: `data-open` / `data-closed` (hộp thoại, sheet, select), `data-checked` / `data-unchecked`, `data-active` (tab), `data-highlighted` (mục select), `data-disabled`, `data-placeholder`. Không còn `data-[state=*]`.
+- **Lớp phủ:** `bg-overlay` (token), `absolute inset-0` trong `body { position: relative }` (iOS 26+). Toast (`<Toaster />`) nằm ở root layout, NGOÀI `div.isolate`, để luôn nổi trên lớp phủ.
+- **Select:** truyền `items` cho `<Select>` để `<SelectValue>` hiện nhãn (không có thì hiện giá trị thô).
+- Kiểu `WithClassName` và class nút đóng dùng chung ở `src/components/ui/shared.ts`.
+- **Không chạy `shadcn add --overwrite` / `shadcn apply`**: sẽ ghi đè lớp Lam & Nắng. Thành phần mới thì port tay từ registry base, giữ token của dự án.
+
 - **Button:** `default` (lam), `highlight` (vàng), `soft`, `outline`, `ghost`, `destructive`, `destructive-ghost`, `secondary`, `link`. Cỡ: `default` cao 40px, `sm` 36px, `lg` 44px, `icon` 40px, `icon-sm` 36px. Nút không có bóng.
 - **Badge / chip:** trạng thái `ok`, `warn`, `danger`, `primary`, `muted`, `outline`; mảng `work`, `teach`, `study`, `growth`. Bo 6px, chữ 12/16 đậm 600.
 - **Bo góc** (theo b0): thẻ 10px (`--radius`), sheet 22px, chip 6px.
