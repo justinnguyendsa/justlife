@@ -16,9 +16,9 @@ adr_lms: .agents/specs/architecture/ADR-002-multiuser-lms-21062026.md
 
 | Lớp | Lựa chọn | Ghi chú |
 |---|---|---|
-| Framework | **Next.js 15 (App Router)** full-stack | FE + BE chung 1 codebase, 1 deploy |
+| Framework | **Next.js 15.5 (App Router)** full-stack, ghim exact | FE + BE chung 1 codebase, 1 deploy; nâng Next 16 (`proxy.ts`) ở ADR-005 3b |
 | Ngôn ngữ | **TypeScript** end-to-end | |
-| Styling | **Tailwind v4 + shadcn/ui**, biến trong `src/styles/tokens.css` | thay hệ 2026-09-18 (trước đó: CSS thuần "Cobalt & Amber"); no hardcode, no gradient |
+| Styling | **Tailwind v4 + shadcn/ui trên Base UI** (`@base-ui/react` ghim exact), biến trong `src/styles/tokens.css` | thay hệ 2026-09-18 (trước đó: CSS thuần "Cobalt & Amber"); Radix → Base UI 14/10/2026 (ADR-005 3c); no hardcode, no gradient |
 | Font | Inter (+ mono stack hệ thống) | nạp qua `next/font/google`, subset vietnamese |
 | Icon | lucide-react | stroke 1.5–2 |
 | API / BE | Next.js Route Handlers / Server Actions | tách `/api/personal/*` vs `/api/lms/*` |
@@ -52,7 +52,12 @@ src/
 ```
 
 ## Phụ thuộc thêm ở P5 (ADR-002)
-- `next-auth@^5` + `@auth/core` (Auth.js v5). Crypto dùng Node `crypto` built-in (không lib ngoài).
+- `next-auth` + `@auth/core` (Auth.js v5) — **ghim exact** (13/10/2026: `5.0.0-beta.32` + `0.41.3`, vá 3 advisory critical). Crypto dùng Node `crypto` built-in (không lib ngoài).
+
+## Quy tắc phiên bản (ADR-005 §2.6)
+- Ghim **exact** (không `^`/`~`) cho framework, auth, UI primitive.
+- Chỉ dùng bản đã phát hành **≥ 2 tuần**; **bản vá bảo mật được miễn**.
+- Trước khi merge mọi bước nâng cấp: `npm test` + `npm run test:smoke` (smoke HTTP trên `next build` + `next start`) phải xanh.
 
 ## Lộ trình mở rộng không-rewrite (P1 → P5)
 Cùng engine SQLite/libSQL xuyên suốt · hai mặt tách sẵn từ đầu (route group + 2 DB client) · auth là add-on bật ở P5 · analytics là consumer độc lập (P6). → bắt đầu nhẹ, lớn dần. **P5a build an toàn LOCAL trước** (access-code + đĩa local), **P5b go-live** (Turso + Google OAuth + object storage) — không rewrite, chỉ đổi config/adapter.
