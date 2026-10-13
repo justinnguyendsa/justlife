@@ -23,24 +23,29 @@ export async function getTask(id: string) {
   return r[0] ?? null;
 }
 
+// Các truy vấn độc lập chạy song song: 1 đợt round-trip tới Turso thay vì 4 lượt nối đuôi (SPEC-Perf-P1 T01).
 export async function getTodayData(now = Date.now()) {
-  const doing = await db.select().from(task).where(eq(task.status, "doing")).orderBy(desc(task.priorityScore));
-  const top = await db.select().from(task)
-    .where(and(ne(task.status, "done"), ne(task.status, "doing"), isNotNull(task.priorityScore)))
-    .orderBy(desc(task.priorityScore)).limit(3);
   const day0 = startOfDay(now);
-  const blocks = await db.select().from(timeBlock)
-    .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt));
-  const fixed = await db.select().from(fixedSchedule);
+  const [doing, top, blocks, fixed] = await Promise.all([
+    db.select().from(task).where(eq(task.status, "doing")).orderBy(desc(task.priorityScore)),
+    db.select().from(task)
+      .where(and(ne(task.status, "done"), ne(task.status, "doing"), isNotNull(task.priorityScore)))
+      .orderBy(desc(task.priorityScore)).limit(3),
+    db.select().from(timeBlock)
+      .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt)),
+    db.select().from(fixedSchedule),
+  ]);
   return { doing, top, blocks, fixed };
 }
 
 export async function getCalendarData(dayMs = Date.now()) {
   const day0 = startOfDay(dayMs);
-  const fixed = await db.select().from(fixedSchedule);
-  const blocks = await db.select().from(timeBlock)
-    .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt));
-  const tasks = await db.select().from(task).where(ne(task.status, "done")).orderBy(desc(task.priorityScore));
+  const [fixed, blocks, tasks] = await Promise.all([
+    db.select().from(fixedSchedule),
+    db.select().from(timeBlock)
+      .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt)),
+    db.select().from(task).where(ne(task.status, "done")).orderBy(desc(task.priorityScore)),
+  ]);
   return { day0, fixed, blocks, tasks };
 }
 
