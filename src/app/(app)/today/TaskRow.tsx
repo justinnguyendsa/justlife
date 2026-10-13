@@ -20,19 +20,25 @@ export function TaskRow({ task, now, compact = false }: { task: Task; now: numbe
 
   const markDone = () =>
     start(async () => {
-      const r = await setTaskStatus(task.id, "done");
-      if (!r.ok) return toast("Chưa lưu được, thử lại nhé", true);
-      toast(`Đã xong: ${task.title}`);
-      router.refresh();
+      try {
+        const r = await setTaskStatus(task.id, "done");
+        if (!r.ok) return toast("Chưa lưu được, thử lại nhé", true);
+        toast(`Đã xong: ${task.title}`);
+        router.refresh();
+      } catch {
+        toast("Chưa lưu được — kiểm tra kết nối rồi thử lại", true);
+      }
     });
 
   const startFocus = () =>
     start(async () => {
-      const r = await setTaskStatus(task.id, "doing");
-      if (!r.ok && "wip_exceeded" in r && r.wip_exceeded) {
-        return toast(`Đã đủ ${r.limit} việc đang làm — tạm dừng một việc trước`, true);
+      try {
+        const r = await setTaskStatus(task.id, "doing");
+        if (!r.ok) return toast("wip_exceeded" in r && r.wip_exceeded ? `Đã đủ ${r.limit} việc đang làm — tạm dừng một việc trước` : "Chưa bắt đầu được, thử lại nhé", true);
+        router.push("/focus");
+      } catch {
+        toast("Chưa bắt đầu được — kiểm tra kết nối rồi thử lại", true);
       }
-      router.push("/focus");
     });
 
   return (
@@ -61,7 +67,7 @@ export function TaskRow({ task, now, compact = false }: { task: Task; now: numbe
         </span>
       )}
       {!compact && (
-        <Button variant="ghost" size="icon" aria-label={`Bắt đầu tập trung: ${task.title}`} onClick={startFocus} disabled={pending}>
+        <Button variant="ghost" size="icon" className="size-11 md:size-10" aria-label={`Bắt đầu tập trung: ${task.title}`} onClick={startFocus} disabled={pending}>
           <Play className="fill-current" aria-hidden="true" />
         </Button>
       )}

@@ -82,9 +82,10 @@ export function AddTask() {
     const openDialog = () => setOpen(true);
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "n" && e.key !== "N") return;
-      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      if (el?.closest('[role="listbox"],[role="menu"],[role="dialog"],[role="combobox"]')) return;
       e.preventDefault();
       setOpen(true);
     };

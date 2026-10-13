@@ -11,12 +11,13 @@ export type HabitToday = { id: string; name: string; streak: number; doneToday: 
 // Thói quen hôm nay (SPEC-UI-P2.1 T04): tick 1 chạm, phản hồi ngay (optimistic), lỗi thì hoàn lại.
 // variant "list" cho cột phải web, "chips" cho điện thoại.
 export function HabitsToday({ habits, variant }: { habits: HabitToday[]; variant: "list" | "chips" }) {
-  const [, start] = useTransition();
+  const [pending, start] = useTransition();
   const [items, flip] = useOptimistic(habits, (state, id: string) =>
     state.map((h) => (h.id === id ? { ...h, doneToday: !h.doneToday, streak: h.streak + (h.doneToday ? -1 : 1) } : h)),
   );
 
-  const toggle = (h: HabitToday) =>
+  const toggle = (h: HabitToday) => {
+    if (pending) return;
     start(async () => {
       flip(h.id);
       try {
@@ -25,6 +26,7 @@ export function HabitsToday({ habits, variant }: { habits: HabitToday[]; variant
         toast("Chưa lưu được thói quen, thử lại nhé", true);
       }
     });
+  };
 
   if (habits.length === 0) {
     return <p className="text-muted-foreground text-[13px]">Chưa có thói quen nào. Thêm ở Cuộc sống → Thói quen.</p>;

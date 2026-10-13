@@ -44,12 +44,12 @@ export default async function TodayPage() {
 
   const due48: DeadlineEntry[] = [...deadlines.overdue, ...deadlines.upcoming.filter((e) => e.dueAt <= now + H48)];
   const nowTask = doing[0] ?? top[0] ?? null;
-  const priorities = doing[0] ? top : top.slice(1);
+  const priorities = doing[0] ? top.slice(0, 3) : top.slice(1, 4);
   const habitRows = habits.map((h) => ({ id: h.id, name: h.name, streak: h.streak, doneToday: h.doneToday }));
 
   const sub = [
     fmtDayShort(now),
-    `còn ${top.length} việc ưu tiên`,
+    `còn ${Math.min(top.length, 3)} việc ưu tiên`,
     due48.length ? `${due48.length} hạn trong 48 giờ` : null,
   ].filter(Boolean).join(" · ");
 
@@ -151,7 +151,7 @@ function Timeline({ slots, empty }: { slots: Slot[]; empty: string }) {
           {s.kind === "free" ? (
             <Link
               href={`/calendar?day=${startOfDay(s.startAt)}`}
-              className="border-input text-muted-foreground hover:bg-accent min-h-8 flex-1 rounded-md border border-dashed px-2.5 py-1.5 text-xs font-medium transition-colors"
+              className="border-input text-muted-foreground hover:bg-accent flex min-h-11 flex-1 items-center rounded-md border border-dashed px-2.5 py-1.5 text-xs font-medium transition-colors md:min-h-8"
             >
               Trống {fmtDuration(Math.round((s.endAt - s.startAt) / 60_000))} · xếp việc vào đây
             </Link>

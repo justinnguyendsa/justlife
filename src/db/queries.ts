@@ -27,7 +27,7 @@ export async function getTodayData(now = Date.now()) {
   const doing = await db.select().from(task).where(eq(task.status, "doing")).orderBy(desc(task.priorityScore));
   const top = await db.select().from(task)
     .where(and(ne(task.status, "done"), ne(task.status, "doing"), isNotNull(task.priorityScore)))
-    .orderBy(desc(task.priorityScore)).limit(3);
+    .orderBy(desc(task.priorityScore)).limit(4); // 4 = 1 lên thẻ gợi ý + 3 hàng ưu tiên (Hôm nay)
   const day0 = startOfDay(now);
   const blocks = await db.select().from(timeBlock)
     .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt));

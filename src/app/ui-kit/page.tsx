@@ -283,8 +283,9 @@ export default function UiKitPage() {
         </div>
       </Block>
 
-      <Block title="Hôm nay — thành phần P2.1 (dữ liệu mẫu, bấm sẽ không lưu)">
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_300px]">
+      <Block title="Hôm nay — thành phần P2.1 (dữ liệu mẫu, chỉ để xem — đã khoá bấm)">
+        {/* inert: chặn bấm/focus — các component này gọi server action thật */}
+        <div inert className="grid gap-6 md:grid-cols-[minmax(0,1fr)_300px]">
           <div className="flex flex-col gap-4">
             <NowCard task={sampleTask({ title: "Chuẩn bị báo cáo doanh thu tuần", status: "doing", deadlineAt: NOW + 2 * 3600_000 })} doing extra={1} now={NOW} />
             <NowCard task={sampleTask({ title: "Đọc chương 4 — Hồi quy logistic", area: "study", priorityScore: 74 })} doing={false} extra={0} now={NOW} />

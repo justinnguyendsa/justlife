@@ -17,9 +17,14 @@ export function RestToday({ todayMin }: { todayMin: number }) {
 
   const rest10 = () =>
     start(async () => {
-      await addRest({ minutes: 10 });
-      toast("Đã ghi 10 phút nghỉ");
-      router.refresh();
+      try {
+        const r = await addRest({ minutes: 10 });
+        if (!r?.ok) return toast("Chưa ghi được giờ nghỉ, thử lại nhé", true);
+        toast("Đã ghi 10 phút nghỉ");
+        router.refresh();
+      } catch {
+        toast("Chưa ghi được — kiểm tra kết nối rồi thử lại", true);
+      }
     });
 
   return (
@@ -34,7 +39,7 @@ export function RestToday({ todayMin }: { todayMin: number }) {
       >
         <div className="bg-primary h-full rounded-full transition-[width]" style={{ width: `${pct}%` }} />
       </div>
-      <Button variant="outline" className="w-full" onClick={rest10} disabled={pending}>
+      <Button variant="outline" className="h-11 w-full md:h-10" onClick={rest10} disabled={pending}>
         <Coffee aria-hidden="true" />
         Nghỉ 10 phút
       </Button>

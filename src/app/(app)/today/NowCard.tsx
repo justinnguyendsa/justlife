@@ -28,21 +28,27 @@ export function NowCard({ task, doing, extra, now }: { task: Task | null; doing:
 
   const markDone = () =>
     start(async () => {
-      const r = await setTaskStatus(task.id, "done");
-      if (!r.ok) return toast("Chưa lưu được, thử lại nhé", true);
-      toast(`Đã xong: ${task.title}`);
-      router.refresh();
+      try {
+        const r = await setTaskStatus(task.id, "done");
+        if (!r.ok) return toast("Chưa lưu được, thử lại nhé", true);
+        toast(`Đã xong: ${task.title}`);
+        router.refresh();
+      } catch {
+        toast("Chưa lưu được — kiểm tra kết nối rồi thử lại", true);
+      }
     });
 
   const focus = () =>
     start(async () => {
-      if (!doing) {
-        const r = await setTaskStatus(task.id, "doing");
-        if (!r.ok && "wip_exceeded" in r && r.wip_exceeded) {
-          return toast(`Đã đủ ${r.limit} việc đang làm — tạm dừng một việc trước`, true);
+      try {
+        if (!doing) {
+          const r = await setTaskStatus(task.id, "doing");
+          if (!r.ok) return toast("wip_exceeded" in r && r.wip_exceeded ? `Đã đủ ${r.limit} việc đang làm — tạm dừng một việc trước` : "Chưa bắt đầu được, thử lại nhé", true);
         }
+        router.push("/focus");
+      } catch {
+        toast("Chưa bắt đầu được — kiểm tra kết nối rồi thử lại", true);
       }
-      router.push("/focus");
     });
 
   return (
@@ -57,12 +63,12 @@ export function NowCard({ task, doing, extra, now }: { task: Task | null; doing:
       </div>
       <div className="flex shrink-0 gap-2">
         {doing && (
-          <Button variant="outline" onClick={markDone} disabled={pending} className="flex-1 md:flex-none">
+          <Button variant="outline" onClick={markDone} disabled={pending} className="h-11 flex-1 md:h-10 md:flex-none">
             <Check aria-hidden="true" />
             Xong
           </Button>
         )}
-        <Button variant="highlight" onClick={focus} disabled={pending} className="flex-1 md:flex-none">
+        <Button variant="highlight" onClick={focus} disabled={pending} className="h-11 flex-1 md:h-10 md:flex-none">
           <Play className="fill-current" aria-hidden="true" />
           {doing ? "Tiếp tục tập trung" : "Bắt đầu tập trung"}
         </Button>
