@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import { THEME_SCRIPT } from "@/lib/theme";
+import { Toaster } from "@/components/Toaster";
 import "./globals.css";
 
 const inter = Inter({
@@ -41,6 +42,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         {/* Ngữ cảnh xếp lớp riêng cho app: popup Base UI (portal vào body) luôn nổi trên nội dung (ADR-005 3c.2). */}
         <div className="isolate">{children}</div>
+        {/* Toast nằm NGOÀI lớp isolate → luôn nổi trên lớp phủ khi hộp thoại/sheet đang mở (QC 3c M1). */}
+        <Toaster />
       </body>
     </html>
   );

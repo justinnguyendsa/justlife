@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { toast } from "@/components/Toaster";
 
 // Mẫu bấm được cho Dialog / Sheet (ADR-005 3c.2) — để kiểm mở/đóng, Esc, bấm nền, focus quay về nút,
 // chuyển cảnh và Sheet dưới trên điện thoại. Chỉ ở /ui-kit (dev).
@@ -33,6 +34,9 @@ export function OverlayPreview() {
               <Input id="ov-demo" name="demo" className="h-11 md:h-10" placeholder="Gõ rồi Enter" />
             </div>
             <Button type="submit" className="h-11 md:h-10">Lưu</Button>
+            <Button type="button" variant="outline" className="h-11 md:h-10" onClick={() => toast("Thông báo nằm trên lớp phủ", true)}>
+              Thử thông báo
+            </Button>
           </form>
         </DialogContent>
       </Dialog>
