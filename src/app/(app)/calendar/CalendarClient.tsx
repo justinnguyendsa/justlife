@@ -1,15 +1,25 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ChevronLeft, ChevronRight, CalendarDays, LayoutGrid } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { FixedSchedule, TimeBlock, Task } from "@/db/schema";
 import { createTimeBlock } from "@/app/actions/schedule";
-import type { Conflict } from "@/lib/scheduler";
-import { fmtTime, fmtDate } from "@/lib/format";
+import { fixedToRange, maskHasDate, startOfDay, type Conflict } from "@/lib/scheduler";
+import { freeSlots } from "@/lib/day-slots";
+import { fmtDate, fmtDayShort, fmtDuration, fmtTime } from "@/lib/format";
 import { AREAS } from "@/lib/areas";
+import { DESKTOP_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { toast } from "@/components/Toaster";
+import { PageHeader } from "@/components/PageHeader";
+import { Segmented } from "@/components/Segmented";
 import { CalendarDragDrop } from "@/components/CalendarDragDrop";
 import { CalendarWeekView, getWeekDays } from "@/components/CalendarWeekView";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { BlockEditor } from "./BlockEditor";
 
 // ─── Helper: lấy thứ Hai đầu tuần chứa `ms` (local time) ───────────────────
 export function getMonday(ms: number): number {
@@ -22,367 +32,287 @@ export function getMonday(ms: number): number {
 }
 
 const DAY_MS = 86_400_000;
-const START_HOUR = 7;
-const END_HOUR = 23;
-const HOUR_MS = 3_600_000;
+const DURATIONS = [
+  { value: "30", label: "30 phút" },
+  { value: "60", label: "1 giờ" },
+  { value: "90", label: "1 giờ 30" },
+  { value: "120", label: "2 giờ" },
+];
 
+// Màn Lịch (SPEC-UI-P2.3, canvas J03): thanh tiêu đề có điều hướng ngày/tuần; lưới ngày kéo-thả;
+// cột phải (web) = Khối đang chọn + Khe trống; điện thoại = sheet sửa khối.
 export function CalendarClient({
   day0: initialDay0,
+  now,
   fixed,
   blocks,
   tasks,
+  initialView,
 }: {
   day0: number;
+  now: number;
   fixed: FixedSchedule[];
   blocks: TimeBlock[];
   tasks: Task[];
+  initialView: "day" | "week";
 }) {
   const router = useRouter();
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const [pending, start] = useTransition();
 
-  // ─── View mode toggle ─────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<"day" | "week">("day");
+  const [viewMode, setViewMode] = useState<"day" | "week">(initialView);
   const [day0, setDay0] = useState(initialDay0);
   const [weekStart, setWeekStart] = useState(() => getMonday(initialDay0));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Khi chuyển sang tuần, đảm bảo weekStart luôn đồng bộ với ngày hiện tại
-  function switchToWeek() {
-    setWeekStart(getMonday(day0));
-    setViewMode("week");
-    // Cần load blocks của cả tuần — trigger router refresh với param weekStart
-    const ws = getMonday(day0);
-    router.push(`/calendar?weekStart=${ws}`);
-  }
+  const selected = selectedId ? blocks.find((b) => b.id === selectedId) ?? null : null;
+  const selectedTask = selected?.taskId ? tasks.find((t) => t.id === selected.taskId) ?? null : null;
 
-  function switchToDay(d?: number) {
-    const target = d ?? day0;
-    setDay0(target);
-    setViewMode("day");
-    router.push(`/calendar?day=${target}`);
-  }
+  // ─── Điều hướng (ngày ↔ tuần) ─────────────────────────────────────────────
+  const goDay = (d: number) => { setDay0(d); setViewMode("day"); setSelectedId(null); router.push(`/calendar?day=${d}`); };
+  const goWeek = (ws: number) => { setWeekStart(ws); setViewMode("week"); setSelectedId(null); router.push(`/calendar?weekStart=${ws}`); };
+  const prev = () => (viewMode === "day" ? goDay(day0 - DAY_MS) : goWeek(weekStart - 7 * DAY_MS));
+  const next = () => (viewMode === "day" ? goDay(day0 + DAY_MS) : goWeek(weekStart + 7 * DAY_MS));
+  const today = () => (viewMode === "day" ? goDay(startOfDay(Date.now())) : goWeek(getMonday(Date.now())));
 
-  // ─── Điều hướng ngày/tuần ─────────────────────────────────────────────────
-  function prevDay() {
-    const next = day0 - DAY_MS;
-    setDay0(next);
-    router.push(`/calendar?day=${next}`);
-  }
-  function nextDay() {
-    const next = day0 + DAY_MS;
-    setDay0(next);
-    router.push(`/calendar?day=${next}`);
-  }
-  function todayDay() {
-    const t0 = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
-    setDay0(t0);
-    router.push(`/calendar?day=${t0}`);
-  }
+  // ─── Khe trống của ngày đang xem ──────────────────────────────────────────
+  const slots = useMemo(() => {
+    const dayDate = new Date(day0);
+    const busy = [
+      ...fixed.filter((f) => maskHasDate(f.weekdayMask, dayDate)).map((f) => fixedToRange(f, day0)),
+      ...blocks.filter((b) => b.startAt >= day0 && b.startAt < day0 + DAY_MS),
+    ];
+    return freeSlots(day0, busy, startOfDay(now) === day0 ? now : day0, { max: 4 });
+  }, [day0, fixed, blocks, now]);
 
-  function prevWeek() {
-    const ws = weekStart - 7 * DAY_MS;
-    setWeekStart(ws);
-    router.push(`/calendar?weekStart=${ws}`);
-  }
-  function nextWeek() {
-    const ws = weekStart + 7 * DAY_MS;
-    setWeekStart(ws);
-    router.push(`/calendar?weekStart=${ws}`);
-  }
-  function todayWeek() {
-    const ws = getMonday(Date.now());
-    setWeekStart(ws);
-    router.push(`/calendar?weekStart=${ws}`);
-  }
-
-  // ─── Sheet "Thêm khối" ───────────────────────────────────────────────────
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [selTaskId, setSelTaskId] = useState<string | "">("");
+  // ─── Hộp "Thêm khối" ──────────────────────────────────────────────────────
+  const [addOpen, setAddOpen] = useState(false);
+  const [selTaskId, setSelTaskId] = useState("");
   const [freeTitle, setFreeTitle] = useState("");
-  const [area, setArea] = useState<string>("work");
+  const [area, setArea] = useState("work");
   const [startHHMM, setStartHHMM] = useState("09:00");
-  const [durMin, setDurMin] = useState(60);
+  const [durMin, setDurMin] = useState("60");
 
-  useEffect(() => {
-    if (!sheetOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSheetOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [sheetOpen]);
-
-  function openSheet(hhmm?: string) {
+  function openAdd(hhmm?: string) {
     setSelTaskId("");
     setFreeTitle("");
     setArea("work");
-    setDurMin(60);
+    setDurMin("60");
     if (hhmm) setStartHHMM(hhmm);
-    setSheetOpen(true);
+    setAddOpen(true);
   }
 
-  // Callback từ CalendarDragDrop khi block được cập nhật thành công
-  function onBlockUpdated(conflicts: Conflict[]) {
-    router.refresh();
-    if (conflicts.length) {
-      toast(`Trùng lịch: ${conflicts[0].label}`, true);
-    }
-  }
-
-  // Tạo block từ sheet
   function submitCreate() {
     const picked = selTaskId ? tasks.find((t) => t.id === selTaskId) ?? null : null;
     const title = picked ? picked.title : freeTitle.trim();
-    if (!title) {
-      toast("Hãy chọn một việc hoặc nhập tiêu đề", true);
-      return;
-    }
+    if (!title) return toast("Chọn một việc hoặc nhập tiêu đề khối", true);
     const [hh, mm] = startHHMM.split(":").map(Number);
-    if (Number.isNaN(hh) || Number.isNaN(mm)) {
-      toast("Giờ bắt đầu không hợp lệ", true);
-      return;
-    }
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return toast("Giờ bắt đầu không hợp lệ", true);
     const startAt = day0 + (hh * 60 + mm) * 60_000;
-    const endAt = startAt + durMin * 60_000;
-    const useArea = picked ? picked.area : area;
+    const endAt = startAt + Number(durMin) * 60_000;
     start(async () => {
-      const res = await createTimeBlock({
-        taskId: picked?.id ?? null,
-        title,
-        startAt,
-        endAt,
-        area: useArea,
-      });
-      setSheetOpen(false);
-      router.refresh();
-      if (res.conflicts.length) {
-        toast(`Trùng lịch: ${res.conflicts[0].label}`, true);
-      } else {
-        toast(`Đã xếp ${title} · ${fmtTime(startAt)}–${fmtTime(endAt)}`);
+      try {
+        const res = await createTimeBlock({ taskId: picked?.id ?? null, title, startAt, endAt, area: picked ? picked.area : area });
+        setAddOpen(false);
+        router.refresh();
+        toast(res.conflicts.length ? `Đã xếp — trùng với ${res.conflicts[0].label}` : `Đã xếp ${title} · ${fmtTime(startAt)}–${fmtTime(endAt)}`, res.conflicts.length > 0);
+      } catch {
+        toast("Chưa xếp được — kiểm tra kết nối rồi thử lại", true);
       }
     });
   }
 
-  // ─── Render header tuần ─────────────────────────────────────────────────
-  function WeekRangeLabel() {
-    const days = getWeekDays(weekStart);
-    const first = days[0];
-    const last = days[6];
-    return (
-      <span style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-        {fmtDate(first)} – {fmtDate(last)}
-      </span>
-    );
+  function onBlockUpdated(conflicts: Conflict[]) {
+    router.refresh();
+    if (conflicts.length) toast(`Trùng lịch: ${conflicts[0].label}`, true);
   }
+
+  const sub =
+    viewMode === "day"
+      ? fmtDayShort(day0)
+      : (() => { const d = getWeekDays(weekStart); return `Tuần ${fmtDate(d[0])} – ${fmtDate(d[6])}`; })();
+
+  const toolbar = (
+    <>
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="icon-sm" className="size-11 md:size-9" onClick={prev} aria-label={viewMode === "day" ? "Ngày trước" : "Tuần trước"}>
+          <ChevronLeft aria-hidden="true" />
+        </Button>
+        <Button variant="outline" size="sm" className="h-11 md:h-9" onClick={today}>Hôm nay</Button>
+        <Button variant="outline" size="icon-sm" className="size-11 md:size-9" onClick={next} aria-label={viewMode === "day" ? "Ngày sau" : "Tuần sau"}>
+          <ChevronRight aria-hidden="true" />
+        </Button>
+      </div>
+      <div className="hidden w-[150px] md:block">
+        <Segmented
+          options={[{ value: "day", label: "Ngày" }, { value: "week", label: "Tuần" }]}
+          value={viewMode}
+          onChange={(v) => (v === "day" ? goDay(day0) : goWeek(getMonday(day0)))}
+          ariaLabel="Kiểu xem"
+        />
+      </div>
+      {viewMode === "day" && (
+        <Button size="sm" className="hidden md:inline-flex" onClick={() => openAdd()}>
+          <Plus aria-hidden="true" />
+          Thêm khối
+        </Button>
+      )}
+    </>
+  );
+
+  const editor = selected ? (
+    <BlockEditor
+      key={selected.id}
+      block={selected}
+      task={selectedTask}
+      fixed={fixed}
+      blocks={blocks}
+      onClose={() => setSelectedId(null)}
+      showClose={isDesktop}
+    />
+  ) : null;
 
   return (
     <>
-      {/* ─── Toolbar: toggle Day/Week + điều hướng ─────────────────────────── */}
-      <div className="flex between center" style={{ margin: "4px 0 10px", gap: 8, flexWrap: "wrap" }}>
-        {/* Toggle Day / Week */}
-        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
-          <button
-            className={"btn" + (viewMode === "day" ? "" : " ghost")}
-            style={{ borderRadius: 0, gap: 4, padding: "5px 10px", fontSize: 13 }}
-            onClick={() => switchToDay()}
-            aria-pressed={viewMode === "day"}
-            title="Xem ngày"
-          >
-            <CalendarDays width={14} height={14} /> Ngày
-          </button>
-          <button
-            className={"btn" + (viewMode === "week" ? "" : " ghost")}
-            style={{ borderRadius: 0, gap: 4, padding: "5px 10px", fontSize: 13, borderLeft: "1px solid var(--border)" }}
-            onClick={switchToWeek}
-            aria-pressed={viewMode === "week"}
-            title="Xem tuần"
-          >
-            <LayoutGrid width={14} height={14} /> Tuần
-          </button>
-        </div>
+      <PageHeader title="Lịch" sub={sub} action={toolbar} />
 
-        {/* Điều hướng */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <button
-            className="btn ghost"
-            style={{ padding: "5px 8px" }}
-            onClick={viewMode === "day" ? prevDay : prevWeek}
-            aria-label={viewMode === "day" ? "Ngày trước" : "Tuần trước"}
-          >
-            <ChevronLeft width={16} height={16} />
-          </button>
-
-          {viewMode === "day" ? (
-            <span style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", minWidth: 120, textAlign: "center" }}>
-              {fmtDate(day0)}
-            </span>
-          ) : (
-            <WeekRangeLabel />
-          )}
-
-          <button
-            className="btn ghost"
-            style={{ padding: "5px 8px" }}
-            onClick={viewMode === "day" ? nextDay : nextWeek}
-            aria-label={viewMode === "day" ? "Ngày tiếp" : "Tuần tiếp"}
-          >
-            <ChevronRight width={16} height={16} />
-          </button>
-
-          <button
-            className="btn line sm"
-            style={{ fontSize: 12, padding: "4px 8px" }}
-            onClick={viewMode === "day" ? todayDay : todayWeek}
-          >
-            Hôm nay
-          </button>
-        </div>
-
-        {/* Nút thêm khối (chỉ hiện ở DayView) */}
-        {viewMode === "day" && (
-          <button className="btn line sm" onClick={() => openSheet()}>
-            <Plus strokeWidth={2} width={16} height={16} /> Thêm khối
-          </button>
-        )}
+      {/* Điện thoại: công tắc Ngày/Tuần dưới tiêu đề */}
+      <div className="mb-4 md:hidden">
+        <Segmented
+          options={[{ value: "day", label: "Ngày" }, { value: "week", label: "Tuần" }]}
+          value={viewMode}
+          onChange={(v) => (v === "day" ? goDay(day0) : goWeek(getMonday(day0)))}
+          ariaLabel="Kiểu xem"
+        />
       </div>
 
-      {/* ─── Chú thích thời gian (DayView) ─────────────────────────────────── */}
-      {viewMode === "day" && (
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-            {fmtTime(day0 + START_HOUR * HOUR_MS)}–{fmtTime(day0 + (END_HOUR + 1) * HOUR_MS)}
-          </span>
-        </div>
-      )}
-
-      {/* ─── View chính ─────────────────────────────────────────────────────── */}
       {viewMode === "day" ? (
-        <CalendarDragDrop
-          day0={day0}
-          fixed={fixed}
-          blocks={blocks}
-          tasks={tasks}
-          onBlockUpdated={onBlockUpdated}
-          onCreateRequest={(hhmm) => openSheet(hhmm)}
-        />
-      ) : (
-        <CalendarWeekView
-          weekStart={weekStart}
-          fixed={fixed}
-          blocks={blocks}
-          onDayClick={(d) => {
-            setDay0(d);
-            setViewMode("day");
-            router.push(`/calendar?day=${d}`);
-          }}
-        />
-      )}
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_320px] md:gap-7">
+          <CalendarDragDrop
+            day0={day0}
+            now={now}
+            fixed={fixed}
+            blocks={blocks}
+            selectedId={selectedId}
+            onSelect={(b) => setSelectedId((cur) => (cur === b.id ? null : b.id))}
+            onBlockUpdated={onBlockUpdated}
+            onCreateRequest={(hhmm) => openAdd(hhmm)}
+          />
 
-      {/* ─── FAB phụ: thêm khối nhanh trên mobile (DayView) ─────────────────── */}
-      {viewMode === "day" && (
-        <button className="fab" aria-label="Thêm khối lịch" onClick={() => openSheet()}>
-          <Plus strokeWidth={2} />
-        </button>
-      )}
-
-      {/* ─── Sheet thêm khối ────────────────────────────────────────────────── */}
-      {sheetOpen && (
-        <div
-          className="scrim"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSheetOpen(false);
-          }}
-        >
-          <div className="sheet" role="dialog" aria-label="Thêm khối lịch">
-            <h3>Thêm khoảng tập trung</h3>
-
-            <div className="field">
-              <label>Chọn việc (tùy chọn)</label>
-              <select
-                value={selTaskId}
-                onChange={(e) => setSelTaskId(e.target.value)}
-                aria-label="Chọn việc để gắn"
-              >
-                <option value="">— Không gắn việc, nhập tiêu đề tự do —</option>
-                {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
+          <aside className="hidden md:block" aria-label="Khối đang chọn và khe trống">
+            <div className="bg-popover sticky top-[72px] flex max-h-[calc(100vh-88px)] flex-col gap-5 overflow-y-auto rounded-lg border p-5">
+              {isDesktop && editor ? (
+                editor
+              ) : (
+                <p className="text-muted-foreground text-[13px]">Bấm vào một việc đã xếp để đổi giờ, đánh dấu xong hoặc xoá. Kéo khối lên xuống để đổi giờ nhanh.</p>
+              )}
+              <FreeSlots slots={slots} onPick={(hhmm) => openAdd(hhmm)} />
             </div>
+          </aside>
 
-            {!selTaskId && (
-              <>
-                <div className="field">
-                  <label>Tiêu đề khối</label>
-                  <input
-                    value={freeTitle}
-                    onChange={(e) => setFreeTitle(e.target.value)}
-                    placeholder="Ví dụ: Tập trung viết báo cáo..."
-                    aria-label="Tiêu đề khối"
-                  />
-                </div>
-                <div className="field">
-                  <label>Mảng</label>
-                  <div className="areapick">
-                    {AREAS.map((a) => (
-                      <button
-                        key={a.key}
-                        type="button"
-                        className={`a ${a.key}` + (area === a.key ? " on" : "")}
-                        onClick={() => setArea(a.key)}
-                      >
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="row2">
-              <div className="field">
-                <label>Giờ bắt đầu</label>
-                <input
-                  type="time"
-                  value={startHHMM}
-                  onChange={(e) => setStartHHMM(e.target.value)}
-                  aria-label="Giờ bắt đầu"
-                />
-              </div>
-              <div className="field">
-                <label>Thời lượng (phút)</label>
-                <div className="stepper">
-                  <button
-                    type="button"
-                    onClick={() => setDurMin((v) => Math.max(15, v - 15))}
-                    aria-label="Giảm thời lượng"
-                  >
-                    –
-                  </button>
-                  <span className="v">{durMin}</span>
-                  <button
-                    type="button"
-                    onClick={() => setDurMin((v) => Math.min(480, v + 15))}
-                    aria-label="Tăng thời lượng"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="row2" style={{ marginTop: 8 }}>
-              <button className="btn line block" disabled={pending} onClick={() => setSheetOpen(false)}>
-                Hủy
-              </button>
-              <button className="btn primary block" disabled={pending} onClick={submitCreate}>
-                {pending ? "Đang lưu..." : "Lưu khối"}
-              </button>
-            </div>
+          {/* Điện thoại: khe trống dưới lưới */}
+          <div className="md:hidden">
+            <FreeSlots slots={slots} onPick={(hhmm) => openAdd(hhmm)} />
           </div>
         </div>
+      ) : (
+        <CalendarWeekView weekStart={weekStart} fixed={fixed} blocks={blocks} onDayClick={goDay} />
       )}
+
+      {/* Điện thoại: thêm khối bằng nút nổi */}
+      {viewMode === "day" && (
+        <Button
+          size="icon"
+          aria-label="Thêm khối lịch"
+          onClick={() => openAdd()}
+          className="fixed right-[18px] bottom-[150px] z-25 size-[54px] rounded-[17px] shadow-lg md:hidden [&_svg:not([class*='size-'])]:size-6"
+        >
+          <CalendarClock strokeWidth={2} />
+        </Button>
+      )}
+
+      {/* Điện thoại: sheet sửa khối */}
+      <Sheet open={!isDesktop && selected != null} onOpenChange={(v) => { if (!v) setSelectedId(null); }}>
+        <SheetContent side="bottom" className="max-h-[88vh] overflow-y-auto rounded-t-[22px] px-5 pt-3 pb-6">
+          <SheetTitle className="sr-only">Sửa khối lịch</SheetTitle>
+          <SheetDescription className="sr-only">Đổi giờ, đánh dấu xong hoặc xoá khối.</SheetDescription>
+          {!isDesktop && editor}
+        </SheetContent>
+      </Sheet>
+
+      {/* Hộp Thêm khối */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Thêm khối lịch</DialogTitle>
+            <DialogDescription>{fmtDayShort(day0)} — chọn việc có sẵn hoặc đặt tên khối tự do.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cal-task">Việc (không bắt buộc)</Label>
+              <select
+                id="cal-task"
+                value={selTaskId}
+                onChange={(e) => setSelTaskId(e.target.value)}
+                className="border-input bg-card h-11 rounded-md border px-3 text-sm md:h-10"
+              >
+                <option value="">— Không gắn việc, đặt tên tự do —</option>
+                {tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+              </select>
+            </div>
+            {!selTaskId && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="cal-title">Tên khối</Label>
+                  <Input id="cal-title" className="h-11 md:h-10" value={freeTitle} onChange={(e) => setFreeTitle(e.target.value)} placeholder="Ví dụ: Tập trung viết báo cáo" />
+                </div>
+                <fieldset className="flex flex-col gap-1.5">
+                  <legend className="mb-1.5 text-sm font-medium">Mảng</legend>
+                  <Segmented options={AREAS.map((a) => ({ value: a.key, label: a.label }))} value={area} onChange={setArea} ariaLabel="Mảng" />
+                </fieldset>
+              </>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cal-start">Giờ bắt đầu</Label>
+              <Input id="cal-start" type="time" step={900} className="h-11 font-mono md:h-10" value={startHHMM} onChange={(e) => setStartHHMM(e.target.value)} />
+            </div>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1.5 text-sm font-medium">Thời lượng</legend>
+              <Segmented options={DURATIONS} value={durMin} onChange={setDurMin} ariaLabel="Thời lượng" />
+            </fieldset>
+            <div className="flex gap-2">
+              <Button variant="outline" className="h-11 flex-1 md:h-10" onClick={() => setAddOpen(false)} disabled={pending}>Huỷ</Button>
+              <Button className="h-11 flex-1 md:h-10" onClick={submitCreate} disabled={pending}>{pending ? "Đang lưu…" : "Lưu khối"}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
+  );
+}
+
+function FreeSlots({ slots, onPick }: { slots: { startAt: number; endAt: number }[]; onPick: (hhmm: string) => void }) {
+  return (
+    <section aria-labelledby="cal-free" className="flex flex-col gap-2">
+      <h2 id="cal-free" className="text-[15px] font-semibold">Khe trống</h2>
+      {slots.length ? (
+        <ul className="flex flex-col gap-1.5">
+          {slots.map((s) => (
+            <li key={s.startAt}>
+              <button
+                type="button"
+                onClick={() => onPick(fmtTime(s.startAt))}
+                className="border-input text-muted-foreground hover:bg-accent hover:text-foreground flex min-h-11 w-full items-center justify-between rounded-md border border-dashed px-3 text-[13px] transition-colors md:min-h-9"
+              >
+                <span className="font-mono">{fmtTime(s.startAt)}–{fmtTime(s.endAt)}</span>
+                <span>{fmtDuration(Math.round((s.endAt - s.startAt) / 60_000))} · xếp việc</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-muted-foreground text-[13px]">Không còn khe trống từ 1 giờ trở lên.</p>
+      )}
+    </section>
   );
 }

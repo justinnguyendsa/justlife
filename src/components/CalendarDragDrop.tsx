@@ -1,25 +1,29 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
-import type { FixedSchedule, TimeBlock, Task } from "@/db/schema";
+import type { FixedSchedule, TimeBlock } from "@/db/schema";
 import { updateTimeBlock } from "@/app/actions/schedule";
-import { maskHasDate, fixedToRange, detectConflicts, type Conflict } from "@/lib/scheduler";
+import { maskHasDate, fixedToRange, detectConflicts, startOfDay, type Conflict } from "@/lib/scheduler";
 import { fmtTime } from "@/lib/format";
-import { AREA_VAR, AREAS } from "@/lib/areas";
+import { areaSoftClass, areaSolidClass } from "@/lib/areas";
+import { toast } from "@/components/Toaster";
+import { cn } from "@/lib/utils";
 
-// Lưới giờ hiển thị 07:00–23:00 — mỗi giờ cao 46px.
+// Lưới giờ ngày 07:00–23:00 (SPEC-UI-P2.3 F03) — mỗi giờ cao 46px.
+// Khối cố định: nền nhạt, không kéo. Việc đã xếp: nền đặc, kéo dọc đổi giờ (chuột kéo ngay,
+// chạm giữ 0,3 giây). Bấm/chạm không kéo = chọn khối để sửa ở bảng "Khối đang chọn".
 const START_HOUR = 7;
 const END_HOUR = 23;
 const HOUR_PX = 46;
 const HOUR_MS = 3_600_000;
-const SNAP_MIN = 15; // snap kéo-thả về bội số 15 phút
+const SNAP_MIN = 15;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 const GRID_PX = HOURS.length * HOUR_PX;
-const MIN_BLOCK_PX = 16;
-const LONG_PRESS_MS = 300; // ngưỡng long-press mobile (ms)
+const MIN_BLOCK_PX = 18;
+const LONG_PRESS_MS = 300;
+const CLICK_SLOP_PX = 4;
 
 type Range = { startAt: number; endAt: number };
 
-// Quy đổi vị trí dọc (px tính từ đỉnh lưới) ↔ mốc thời gian trong ngày.
 function topPxOf(ms: number, day0: number): number {
   return ((ms - day0) / HOUR_MS - START_HOUR) * HOUR_PX;
 }
@@ -31,189 +35,173 @@ function startAtFromTop(topPx: number, day0: number): number {
 
 export function CalendarDragDrop({
   day0,
+  now,
   fixed,
   blocks,
-  tasks,
+  selectedId,
+  onSelect,
   onBlockUpdated,
   onCreateRequest,
 }: {
   day0: number;
+  now: number;
   fixed: FixedSchedule[];
   blocks: TimeBlock[];
-  tasks: Task[];
+  selectedId: string | null;
+  onSelect: (b: TimeBlock) => void;
   onBlockUpdated: (conflicts: Conflict[]) => void;
   onCreateRequest: (startHHMM: string) => void;
 }) {
-  // Khối cố định áp dụng cho NGÀY đang xem (lọc theo weekdayMask), quy đổi sang khoảng epoch.
   const dayDate = useMemo(() => new Date(day0), [day0]);
   const fixedRanges = useMemo(
     () =>
       fixed
         .filter((f) => maskHasDate(f.weekdayMask, dayDate))
         .map((f) => ({ id: f.id, label: f.label, area: f.area, ...fixedToRange(f, day0) })),
-    [fixed, dayDate, day0]
+    [fixed, dayDate, day0],
   );
 
-  // --- Trạng thái kéo-thả (Pointer Events: hỗ trợ cả chuột & chạm) ---
   const gridRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: string; pointerY0: number; top0: number; height: number } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragTop, setDragTop] = useState(0);
   const [dragConflict, setDragConflict] = useState(false);
 
-  // Long-press mobile: ref lưu timer và trạng thái "đã đủ thời gian long-press"
+  // Chạm (touch): chờ long-press mới kéo; nhả sớm mà không cuộn = chạm để chọn.
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressActive = useRef(false);
-  // Lưu pending drag data để kích hoạt sau khi long-press đủ thời gian
-  const pendingDrag = useRef<{
-    b: TimeBlock;
-    pointerId: number;
-    clientY: number;
-    el: HTMLElement;
-  } | null>(null);
+  const tapCandidate = useRef(false);
+  const pendingDrag = useRef<{ b: TimeBlock; pointerId: number; clientY: number; el: HTMLElement } | null>(null);
 
-  // Kéo block đè khối khác/cố định → tính realtime để tô đỏ (.conflict).
   function computeConflict(id: string, range: Range): boolean {
-    const others = blocks.filter((b) => b.id !== id).map((b) => ({ ...b }));
-    return detectConflicts(range.startAt, range.endAt, fixed, others, id).length > 0;
+    return detectConflicts(range.startAt, range.endAt, fixed, blocks, id).length > 0;
   }
 
   function activateDrag(b: TimeBlock, pointerY0: number, el: HTMLElement, pointerId: number) {
-    el.setPointerCapture(pointerId);
+    try { el.setPointerCapture(pointerId); } catch { /* đã nhả */ }
     const top0 = topPxOf(b.startAt, day0);
-    const height = (b.endAt - b.startAt) / HOUR_MS * HOUR_PX;
+    const height = ((b.endAt - b.startAt) / HOUR_MS) * HOUR_PX;
     drag.current = { id: b.id, pointerY0, top0, height };
     setDragId(b.id);
     setDragTop(top0);
     setDragConflict(false);
   }
 
+  function clearLongPress() {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    pendingDrag.current = null;
+  }
+
   function onBlockPointerDown(e: React.PointerEvent, b: TimeBlock) {
     if (e.button !== 0) return;
-    e.preventDefault();
-
-    // Trên desktop (mouse): kéo ngay. Trên touch: chờ long-press.
     if (e.pointerType === "mouse") {
+      e.preventDefault();
       activateDrag(b, e.clientY, e.currentTarget as HTMLElement, e.pointerId);
-    } else {
-      // Mobile: đặt timer, chờ LONG_PRESS_MS ms
-      longPressActive.current = false;
-      pendingDrag.current = { b, pointerId: e.pointerId, clientY: e.clientY, el: e.currentTarget as HTMLElement };
-      longPressTimer.current = setTimeout(() => {
-        longPressActive.current = true;
-        if (pendingDrag.current) {
-          const { b: pb, clientY, el, pointerId } = pendingDrag.current;
-          try { el.setPointerCapture(pointerId); } catch { /* đã nhả */ }
-          activateDrag(pb, clientY, el, pointerId);
-        }
-      }, LONG_PRESS_MS);
+      return;
     }
+    longPressActive.current = false;
+    tapCandidate.current = true;
+    pendingDrag.current = { b, pointerId: e.pointerId, clientY: e.clientY, el: e.currentTarget as HTMLElement };
+    longPressTimer.current = setTimeout(() => {
+      longPressActive.current = true;
+      tapCandidate.current = false;
+      if (pendingDrag.current) {
+        const { b: pb, clientY, el, pointerId } = pendingDrag.current;
+        activateDrag(pb, clientY, el, pointerId);
+      }
+    }, LONG_PRESS_MS);
   }
 
   function onBlockPointerMove(e: React.PointerEvent) {
-    // Mobile: nếu chưa long-press và pointer di chuyển → coi là scroll, hủy timer
     if (e.pointerType !== "mouse" && !longPressActive.current) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-        pendingDrag.current = null;
+      // Ngón tay di chuyển trước long-press = đang cuộn → không kéo, không chọn.
+      if (pendingDrag.current && Math.abs(e.clientY - pendingDrag.current.clientY) > CLICK_SLOP_PX) {
+        tapCandidate.current = false;
+        clearLongPress();
       }
       return;
     }
-
     const d = drag.current;
     if (!d) return;
-    const delta = e.clientY - d.pointerY0;
-    const maxTop = GRID_PX - d.height;
-    const nextTop = Math.max(0, Math.min(maxTop, d.top0 + delta));
+    const nextTop = Math.max(0, Math.min(GRID_PX - d.height, d.top0 + (e.clientY - d.pointerY0)));
     setDragTop(nextTop);
     const newStart = startAtFromTop(nextTop, day0);
-    const newEnd = newStart + (d.height / HOUR_PX) * HOUR_MS;
-    setDragConflict(computeConflict(d.id, { startAt: newStart, endAt: newEnd }));
+    setDragConflict(computeConflict(d.id, { startAt: newStart, endAt: newStart + (d.height / HOUR_PX) * HOUR_MS }));
   }
 
-  function onBlockPointerUp(e: React.PointerEvent) {
-    // Mobile: nếu chưa đủ long-press → chỉ là tap, bỏ qua drag
+  function onBlockPointerUp(e: React.PointerEvent, b: TimeBlock) {
     if (e.pointerType !== "mouse" && !longPressActive.current) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-        pendingDrag.current = null;
-      }
+      const wasTap = tapCandidate.current;
+      tapCandidate.current = false;
+      clearLongPress();
+      if (wasTap) onSelect(b);
       return;
     }
-
     const d = drag.current;
     if (!d) return;
     longPressActive.current = false;
     pendingDrag.current = null;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {
-      /* pointer đã nhả */
-    }
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* đã nhả */ }
     drag.current = null;
     setDragId(null);
 
-    const finalTop = dragTop;
-    if (Math.abs(finalTop - d.top0) < 2) return;
-
-    const newStart = startAtFromTop(finalTop, day0);
+    if (Math.abs(dragTop - d.top0) < CLICK_SLOP_PX) {
+      onSelect(b); // bấm, không kéo
+      return;
+    }
+    const newStart = startAtFromTop(dragTop, day0);
     const newEnd = newStart + (d.height / HOUR_PX) * HOUR_MS;
-    updateTimeBlock(d.id, newStart, newEnd).then((res) => {
-      onBlockUpdated(res.conflicts);
-    });
+    updateTimeBlock(d.id, newStart, newEnd)
+      .then((res) => onBlockUpdated(res.conflicts))
+      .catch(() => toast("Chưa đổi được giờ — kiểm tra kết nối rồi thử lại", true));
   }
 
-  // Mobile: chạm vào ô giờ trống → gọi onCreateRequest với giờ tương ứng.
-  function onGridPointerDown(e: React.PointerEvent) {
-    if (drag.current) return;
+  // Bấm/chạm ô giờ trống (click: không kích hoạt khi đang cuộn) → mở hộp Thêm khối.
+  function onGridClick(e: React.MouseEvent) {
     if (e.target !== e.currentTarget) return;
     const rect = gridRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const y = e.clientY - rect.top;
-    const ms = startAtFromTop(y, day0);
-    onCreateRequest(fmtTime(ms));
+    onCreateRequest(fmtTime(startAtFromTop(e.clientY - rect.top, day0)));
   }
 
+  const isToday = startOfDay(now) === day0;
+  const nowTop = topPxOf(now, day0);
+
   return (
-    <>
-      <div className="cal">
-        {/* Lưới giờ nền 07:00–23:00 */}
+    <div className="flex flex-col gap-2">
+      <div className="bg-card relative overflow-hidden rounded-lg border">
         {HOURS.map((h) => (
-          <div className="hour" key={h}>
-            <span className="lab">{String(h).padStart(2, "0")}</span>
+          <div key={h} className="border-border/70 flex h-[46px] border-t first:border-t-0">
+            <span className="text-muted-foreground border-border/70 w-12 shrink-0 border-r px-1.5 pt-0.5 text-right font-mono text-[11px]">
+              {String(h).padStart(2, "0")}:00
+            </span>
           </div>
         ))}
 
-        {/* Lớp chứa các khối — bắt chạm nền để mở sheet (mobile chạm-đặt) */}
         <div
-          className="blocks"
           ref={gridRef}
-          style={{ pointerEvents: "auto" }}
-          onPointerDown={onGridPointerDown}
+          onClick={onGridClick}
+          className="absolute inset-y-0 right-1.5 left-12 cursor-copy"
+          aria-label="Lưới giờ — bấm vào ô trống để thêm khối"
         >
-          {/* Khối cố định hôm nay — read-only, không kéo */}
           {fixedRanges.map((f) => {
             const top = topPxOf(f.startAt, day0);
             const height = Math.max(MIN_BLOCK_PX, ((f.endAt - f.startAt) / HOUR_MS) * HOUR_PX);
             return (
               <div
                 key={f.id}
-                className="blk fixed"
                 role="img"
-                aria-label={`Khối cố định: ${f.label}, ${fmtTime(f.startAt)}–${fmtTime(f.endAt)}`}
-                style={{ top, height, background: AREA_VAR[f.area] }}
+                aria-label={`Giờ bận cố định: ${f.label}, ${fmtTime(f.startAt)}–${fmtTime(f.endAt)}`}
+                className={cn("pointer-events-none absolute inset-x-0.5 overflow-hidden rounded-md px-2 py-1 text-xs leading-4 font-semibold", areaSoftClass(f.area))}
+                style={{ top: top + 1, height: height - 2 }}
               >
                 {f.label}
-                <small>
-                  {fmtTime(f.startAt)}–{fmtTime(f.endAt)}
-                </small>
+                {height >= 34 && <span className="block font-mono text-[11px] font-medium opacity-80">{fmtTime(f.startAt)}–{fmtTime(f.endAt)}</span>}
               </div>
             );
           })}
 
-          {/* Time-block (việc đã xếp) — kéo-thả dọc đổi giờ */}
           {blocks.map((b) => {
             const dragging = dragId === b.id;
             const top = dragging ? dragTop : topPxOf(b.startAt, day0);
@@ -221,42 +209,46 @@ export function CalendarDragDrop({
             const liveStart = dragging ? startAtFromTop(dragTop, day0) : b.startAt;
             const liveEnd = liveStart + (b.endAt - b.startAt);
             const conflict = dragging && dragConflict;
+            const selected = selectedId === b.id;
             return (
               <div
                 key={b.id}
-                className={"blk movable" + (dragging ? " drag" : "") + (conflict ? " conflict" : "")}
                 role="button"
-                aria-label={`Việc đã xếp: ${b.title}, ${fmtTime(b.startAt)}–${fmtTime(b.endAt)}. Kéo để đổi giờ.`}
-                style={{ top, height, background: AREA_VAR[b.area] }}
+                tabIndex={0}
+                aria-pressed={selected}
+                aria-label={`Việc đã xếp: ${b.title}, ${fmtTime(b.startAt)}–${fmtTime(b.endAt)}. Bấm để sửa, kéo để đổi giờ.`}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(b); } }}
+                className={cn(
+                  "absolute inset-x-0.5 cursor-grab touch-none overflow-hidden rounded-md px-2 py-1 text-xs leading-4 font-semibold select-none",
+                  conflict ? "bg-destructive text-destructive-foreground" : areaSolidClass(b.area),
+                  dragging && "z-10 cursor-grabbing shadow-lg",
+                  selected && !dragging && "ring-ring ring-offset-card z-[5] ring-2 ring-offset-2",
+                )}
+                style={{ top: top + 1, height: height - 2 }}
                 onPointerDown={(e) => onBlockPointerDown(e, b)}
                 onPointerMove={onBlockPointerMove}
-                onPointerUp={onBlockPointerUp}
+                onPointerUp={(e) => onBlockPointerUp(e, b)}
+                onPointerCancel={() => { tapCandidate.current = false; clearLongPress(); }}
               >
                 {b.title}
-                <small>
-                  {fmtTime(liveStart)}–{fmtTime(liveEnd)}
-                </small>
+                {height >= 34 && <span className="block font-mono text-[11px] font-medium opacity-90">{fmtTime(liveStart)}–{fmtTime(liveEnd)}</span>}
               </div>
             );
           })}
+
+          {isToday && nowTop >= 0 && nowTop <= GRID_PX && (
+            <div aria-hidden="true" className="bg-destructive pointer-events-none absolute -left-1 right-0 z-20 h-0.5" style={{ top: nowTop }}>
+              <span className="bg-destructive absolute -top-[3px] -left-1 size-2 rounded-full" />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Chú thích */}
-      <div className="legend">
-        <span>
-          <i style={{ background: "var(--module-work)" }} /> Khối cố định
-        </span>
-        <span>
-          <i style={{ background: "var(--accent)" }} /> Việc đã xếp (kéo được)
-        </span>
-        <span>
-          <i style={{ background: "var(--danger)" }} /> Trùng lịch
-        </span>
+      <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <span className="inline-flex items-center gap-1.5"><i className="bg-area-work-soft border-area-work/40 size-2.5 rounded-sm border" /> Giờ bận cố định</span>
+        <span className="inline-flex items-center gap-1.5"><i className="bg-area-work size-2.5 rounded-sm" /> Việc đã xếp</span>
+        <span className="inline-flex items-center gap-1.5"><i className="bg-destructive size-2.5 rounded-sm" /> Trùng khi kéo</span>
       </div>
-      <div className="empty" style={{ padding: "10px 4px", textAlign: "left" }}>
-        Máy tính: kéo khối việc lên/xuống để đổi giờ. Điện thoại: chạm ô giờ trống để thêm khối, hoặc giữ khối &gt;0.3 giây rồi kéo.
-      </div>
-    </>
+    </div>
   );
 }
