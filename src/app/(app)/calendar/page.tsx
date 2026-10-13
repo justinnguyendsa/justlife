@@ -2,7 +2,6 @@ import { and, asc, gte, lte, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { fixedSchedule, timeBlock, task } from "@/db/schema";
 import { startOfDay } from "@/lib/scheduler";
-import { PageHeader } from "@/components/PageHeader";
 import { CalendarClient } from "./CalendarClient";
 
 export const dynamic = "force-dynamic";
@@ -63,10 +62,15 @@ export default async function CalendarPage({
       .orderBy(asc(timeBlock.startAt)),
   ]);
 
+  // Thanh tiêu đề nằm trong CalendarClient vì phụ thuộc trạng thái ngày/tuần (SPEC-UI-P2.3 F01).
   return (
-    <>
-      <PageHeader title="Lịch" sub="Xếp việc né giờ bận" />
-      <CalendarClient day0={day0} fixed={fixed} blocks={blocks} tasks={tasks} />
-    </>
+    <CalendarClient
+      day0={day0}
+      now={now}
+      fixed={fixed}
+      blocks={blocks}
+      tasks={tasks}
+      initialView={weekStartParam ? "week" : "day"}
+    />
   );
 }
