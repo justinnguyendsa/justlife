@@ -3,7 +3,9 @@ import type { Provider } from "next-auth/providers";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { authConfig } from "./auth.config";
+import { CredentialsSignin } from "next-auth";
 import { verifyAccessCode } from "@/lib/lms/access-code";
+import { LINK_INTENT_COOKIE, linkIntentSecret, verifyIntent } from "@/lib/lms/link-intent";
 
 // 🔐 Auth.js v5 — entrypoint server (có Node runtime → dùng được verifyAccessCode/node:crypto/OAuth).
 // Provider:
@@ -14,6 +16,30 @@ import { verifyAccessCode } from "@/lib/lms/access-code";
 //
 // 🗣️ Bình dân: học viên nhập "mã truy cập"; còn Minh (chủ app) đăng nhập bằng Google.
 //    Khi chạy trên mạng, chỉ đúng email của Minh mới được vào Personal OS + khu Dạy học.
+
+// Nhập sai quá nhiều ở một nơi → báo "thử lại sau" (không lộ mã có tồn tại hay không) — SPEC-SEC-1.2 M2.
+class TooManyAttempts extends CredentialsSignin {
+  code = "rate_limited";
+}
+
+/** Đọc rồi xoá phiếu liên kết Gmail (một lần dùng). Không đọc được → null. */
+async function takeLinkIntent(): Promise<string | null> {
+  try {
+    const { cookies } = await import("next/headers");
+    const jar = await cookies();
+    const value = jar.get(LINK_INTENT_COOKIE)?.value ?? null;
+    if (value) {
+      try {
+        jar.delete({ name: LINK_INTENT_COOKIE, path: "/api/auth" });
+      } catch {
+        /* ngữ cảnh không cho ghi cookie — phiếu vẫn tự hết hạn sau 5 phút */
+      }
+    }
+    return value;
+  } catch {
+    return null;
+  }
+}
 
 // Provider học viên — luôn có.
 const accessCodeProvider = Credentials({
@@ -29,12 +55,14 @@ const accessCodeProvider = Credentials({
     const fwd = request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim();
     const clientKey = fwd || request?.headers?.get("x-real-ip")?.trim() || "unknown";
     const result = await verifyAccessCode(code, { clientKey });
-    if (!result) return null; // sai / hết hạn / khóa → CHUNG (không tiết lộ)
+    if (result && "blocked" in result) throw new TooManyAttempts();
+    if (!result) return null; // sai / hết hạn / thu hồi → CHUNG (không tiết lộ)
     // Trả về danh tính tối thiểu — callback jwt sẽ gắn vào token.
     return {
       id: result.lmsUserId,
       studentId: result.studentId,
       lmsUserId: result.lmsUserId,
+      accessCodeId: result.accessCodeId,
       isMinor: result.isMinor,
     };
   },
@@ -65,93 +93,92 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Học viên (access-code) mang studentId từ authorize() → đã xác thực, cho qua.
       const u = user as { studentId?: string } | undefined;
       if (u?.studentId) return true;
-      // Còn lại = đăng nhập CHỦ SỞ HỮU (Google). KHÔNG dựa account.provider (Auth.js v5 beta có thể
-      // không khớp "google" → fallback cũ "return true" vô tình cho MỌI tài khoản Google vào = lỗ hổng).
-      // CHỈ cho qua nếu email khớp OWNER_EMAIL + đã verify; người lạ → TỪ CHỐI.
+
+      // H1 (SPEC-SEC-1.2): phiếu liên kết Gmail đọc rồi XOÁ NGAY ở mọi nhánh Google (owner, người lạ,
+      // học viên) → chỉ dùng được một lần, không sót lại cho người dùng máy chung sau đó.
+      const intent = await takeLinkIntent();
+
+      // Còn lại = Google. KHÔNG dựa account.provider (Auth.js v5 beta có thể không khớp "google").
+      // CHỦ SỞ HỮU: email khớp OWNER_EMAIL + đã verify. jwt() kiểm lại lần nữa (resolveRole).
       const owner = process.env.OWNER_EMAIL?.toLowerCase().trim();
       const email = (profile?.email ?? user?.email)?.toLowerCase().trim();
       const verified = profile?.email_verified !== false; // Google trả true cho tài khoản hợp lệ
-      const ok = Boolean(owner && email && email === owner && verified);
-      // Log lần thử đăng nhập thất bại (minimal, KHÔNG lưu email đầy đủ).
-      if (!ok) {
-        // Học viên đăng nhập bằng Gmail (sau khi đã liên kết qua Google — linkVerifiedGoogleEmail).
-        // Bất biến bảo mật:
-        //  - Chỉ lookup bằng emailIndex (blind-index, không giải mã email thô).
-        //  - Chỉ cho vào nếu status === 'active' và có studentId.
-        //  - Nếu không tìm thấy → tiếp tục return false (từ chối).
-        if (email && verified) {
-          // Liên kết Gmail ĐÃ XÁC MINH (SPEC-SEC-1.2 S07): chỉ khi học viên vừa bấm "Liên kết bằng
-          // Google" (phiếu ý định có ký, còn hạn). Gắn xong thì đi tiếp đường tra emailIndex bên dưới.
-          try {
-            const { cookies } = await import("next/headers");
-            const { LINK_INTENT_COOKIE, verifyIntent } = await import("@/lib/lms/link-intent");
-            const jar = await cookies();
-            const intent = jar.get(LINK_INTENT_COOKIE)?.value;
-            if (intent) {
-              const secret = process.env.AUTH_SECRET ?? "";
-              const intentStudentId = verifyIntent(intent, Date.now(), secret);
-              try {
-                jar.delete({ name: LINK_INTENT_COOKIE, path: "/api/auth" });
-              } catch {
-                /* không xoá được cookie ở ngữ cảnh này — phiếu tự hết hạn sau 10 phút */
-              }
-              if (intentStudentId) {
-                const { linkVerifiedGoogleEmail } = await import("@/lib/lms/portal-queries");
-                const linked = await linkVerifiedGoogleEmail(intentStudentId, email, owner ?? "");
-                if (!linked.ok) {
-                  console.error("[student-gmail-link] REJECT", { reason: linked.reason });
-                  // Về lại Hồ sơ kèm lý do (phiên học viên cũ vẫn giữ nguyên, không tạo phiên mới).
-                  return `/portal/profile?link=${linked.reason}`;
-                }
-              }
-            }
-          } catch (e) {
-            console.error("[student-gmail-link] error", e);
-            return "/portal/profile?link=error";
-          }
-          try {
-            const { blindIndex } = await import("@/lib/lms/crypto");
-            const { lmsDb } = await import("@/db/lms/client");
-            const { lmsUser: lmsUserTable } = await import("@/db/lms/schema");
-            const { eq } = await import("drizzle-orm");
-            const emailIdx = blindIndex(email);
-            const found = await lmsDb
-              .select({
-                id: lmsUserTable.id,
-                studentId: lmsUserTable.studentId,
-                isMinor: lmsUserTable.isMinor,
-                status: lmsUserTable.status,
-              })
-              .from(lmsUserTable)
-              .where(eq(lmsUserTable.emailIndex, emailIdx))
-              .limit(1);
-            if (found[0] && found[0].status === "active" && found[0].studentId) {
-              // Gắn thông tin học viên vào user object để jwt callback xử lý.
-              const u = user as Record<string, unknown>;
-              u.studentId = found[0].studentId;
-              u.lmsUserId = found[0].id;
-              u.isMinor = found[0].isMinor === 1;
+      if (owner && email && email === owner && verified) return true;
 
-              return true;
-            }
-          } catch (e) {
-            console.error("[student-gmail-signin] error", e);
-          }
+      // Liên kết Gmail ĐÃ XÁC MINH (S07): chỉ khi phiếu hợp lệ, email được Google xác minh RÕ RÀNG
+      // (=== true), VÀ phiên hiện tại đúng là học viên trong phiếu (H1 — chống gắn nhầm trên máy chung).
+      if (intent) {
+        const intentStudentId = verifyIntent(intent, Date.now(), linkIntentSecret());
+        if (!intentStudentId) return "/portal/profile?link=expired";
+        if (!email || profile?.email_verified !== true) return "/portal/profile?link=invalid";
+        let current: string | undefined;
+        try {
+          current = (await auth())?.studentId;
+        } catch {
+          current = undefined;
         }
-        // 🔎 P0-T01: chẩn đoán AN TOÀN cho log Vercel — CHỈ độ dài + cờ, KHÔNG email,
-        // KHÔNG domain (audit mục 5.3 yêu cầu bỏ domain khỏi log).
-        // Lý do cần: sự cố vừa rồi không chẩn đoán được vì không biết OWNER_EMAIL trên
-        // Vercel dài bao nhiêu. Nếu ownerEmailLen != attemptEmailLen mà match=false thì
-        // gần như chắc chắn giá trị env bị dính ghi chú/khoảng trắng phía sau.
-        console.error("[owner-signin] REJECT", {
-          match: owner === email,
-          attemptEmailLen: email?.length ?? 0,
-          ownerEmailLen: owner?.length ?? 0,
-          verified,
-        });
-        return false; // người lạ / email chưa verify / học viên chưa liên kết → TỪ CHỐI
+        if (current !== intentStudentId) {
+          console.error("[student-gmail-link] REJECT", { reason: "session_mismatch" });
+          return "/portal/profile?link=error";
+        }
+        try {
+          const { linkVerifiedGoogleEmail } = await import("@/lib/lms/portal-queries");
+          const linked = await linkVerifiedGoogleEmail(intentStudentId, email, owner ?? "");
+          if (!linked.ok) {
+            console.error("[student-gmail-link] REJECT", { reason: linked.reason });
+            // Về lại Hồ sơ kèm lý do (phiên học viên cũ vẫn giữ nguyên, không tạo phiên mới).
+            return `/portal/profile?link=${linked.reason}`;
+          }
+          const { logAccess } = await import("@/lib/lms/audit");
+          await logAccess({ actor: intentStudentId, action: "link_gmail", targetType: "student" });
+        } catch (e) {
+          console.error("[student-gmail-link] error", e);
+          return "/portal/profile?link=error";
+        }
       }
-      return true;
+
+      // Học viên đăng nhập bằng Gmail đã liên kết. Bất biến:
+      //  - Chỉ lookup bằng emailIndex (blind-index, không giải mã email thô).
+      //  - Đúng MỘT học viên khớp (dữ liệu cũ trùng index → từ chối), status 'active', có studentId.
+      if (email && verified) {
+        try {
+          const { blindIndex } = await import("@/lib/lms/crypto");
+          const { lmsDb } = await import("@/db/lms/client");
+          const { lmsUser: lmsUserTable } = await import("@/db/lms/schema");
+          const { eq } = await import("drizzle-orm");
+          const found = await lmsDb
+            .select({
+              id: lmsUserTable.id,
+              studentId: lmsUserTable.studentId,
+              isMinor: lmsUserTable.isMinor,
+              status: lmsUserTable.status,
+            })
+            .from(lmsUserTable)
+            .where(eq(lmsUserTable.emailIndex, blindIndex(email)))
+            .limit(2);
+          if (found.length === 1 && found[0].status === "active" && found[0].studentId) {
+            // Gắn thông tin học viên vào user object để jwt callback xử lý (không adapter: cùng object).
+            const s = user as Record<string, unknown>;
+            s.studentId = found[0].studentId;
+            s.lmsUserId = found[0].id;
+            s.isMinor = found[0].isMinor === 1;
+            return true;
+          }
+        } catch (e) {
+          console.error("[student-gmail-signin] error", e);
+        }
+      }
+      // 🔎 P0-T01: chẩn đoán AN TOÀN cho log Vercel — CHỈ độ dài + cờ, KHÔNG email, KHÔNG domain.
+      // Nếu ownerEmailLen != attemptEmailLen mà match=false thì gần như chắc chắn giá trị env bị dính
+      // ghi chú/khoảng trắng phía sau.
+      console.error("[owner-signin] REJECT", {
+        match: owner === email,
+        attemptEmailLen: email?.length ?? 0,
+        ownerEmailLen: owner?.length ?? 0,
+        verified,
+      });
+      // Đang liên kết mà không vào được → về Hồ sơ (L8), không rơi sang trang đăng nhập của chủ.
+      return intent ? "/portal/profile?link=error" : false;
     },
   },
 });

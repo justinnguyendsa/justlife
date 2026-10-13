@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const { hasValidConsent, getIsMinor } = await import("@/lib/lms/consent");
   const { auth: getAuth } = await import("@/auth");
   const session = await getAuth();
-  const isMinor = session?.isMinor ?? (await getIsMinor(studentId));
+  const isMinor = (await getIsMinor(studentId)) || session?.isMinor === true; // DB trước — JWT có thể cũ
   if (!(await hasValidConsent(studentId, isMinor))) {
     return err("Bạn cần hoàn tất đồng ý xử lý dữ liệu.", 403);
   }

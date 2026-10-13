@@ -58,6 +58,10 @@ function isApiPath(path: string): boolean {
   return path.startsWith("/api/");
 }
 
+// H2 (SPEC-SEC-1.2): phiên học viên có hạn TUYỆT ĐỐI tính từ lúc đăng nhập (Auth.js tự gia hạn phiên
+// mỗi lần dùng → trước đây phiên từ mã đã thu hồi sống vô hạn). Hết hạn → đăng nhập lại bằng mã.
+const STUDENT_SESSION_MAX_MS = 30 * 86_400_000;
+
 export const authConfig = {
   // Provider thật nạp ở auth.ts (cần node:crypto / Google). Ở đây để rỗng cho middleware (Edge-safe).
   providers: [],
@@ -84,19 +88,33 @@ export const authConfig = {
         //  - Chủ sở hữu: CHỈ khi email trùng OWNER_EMAIL (SPEC-SEC-1.2 S09). Trước đây "không có
         //    studentId ⟹ owner" — một sơ suất ở signIn là thành leo quyền. Giờ an toàn kép thật sự.
         //  - Còn lại: không có vai trò nào → middleware coi như chưa đăng nhập.
-        const u = user as { studentId?: string; lmsUserId?: string; isMinor?: boolean; email?: string | null };
+        const u = user as { studentId?: string; lmsUserId?: string; isMinor?: boolean; accessCodeId?: string; email?: string | null };
         const r = resolveRole(u, process.env.OWNER_EMAIL, ownerAuthEnabledEnv());
+        if (r.role === null) return null; // không có vai trò → không tạo phiên (L2)
         if (r.role === "student") {
           token.studentId = r.studentId;
           token.lmsUserId = u.lmsUserId;
           token.isMinor = u.isMinor;
+          token.accessCodeId = u.accessCodeId;
+          token.loginAt = Date.now();
           token.role = "student";
+          // Phiên học viên KHÔNG mang tên/email/ảnh Google (L11 — tối thiểu hoá PII).
+          delete token.name;
+          delete token.email;
+          delete token.picture;
         } else {
-          token.role = r.role ?? undefined;
+          token.role = "owner";
           token.studentId = undefined;
           token.lmsUserId = undefined;
           token.isMinor = undefined;
+          token.accessCodeId = undefined;
         }
+        return token;
+      }
+      // Phiên học viên quá hạn tuyệt đối (hoặc phiên cũ chưa có loginAt) → huỷ phiên (H2).
+      if (token.role === "student") {
+        const loginAt = typeof token.loginAt === "number" ? token.loginAt : 0;
+        if (!loginAt || Date.now() - loginAt > STUDENT_SESSION_MAX_MS) return null;
       }
       return token;
     },
@@ -106,6 +124,7 @@ export const authConfig = {
       session.lmsUserId = token.lmsUserId as string | undefined;
       session.isMinor = token.isMinor as boolean | undefined;
       session.role = token.role as string | undefined;
+      session.accessCodeId = token.accessCodeId as string | undefined;
       return session;
     },
     // 🚪 Cổng tầng middleware (chạy trước mỗi request khớp matcher).

@@ -1,6 +1,8 @@
-import { and, asc, desc, eq, inArray, gte } from "drizzle-orm";
+import { cache } from "react";
+import { and, asc, desc, eq, inArray, gte, ne } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import {
+  accessCode,
   enrollment,
   lmsUser,
   tcAssignment,
@@ -44,11 +46,33 @@ import { auth } from "@/auth";
 // Note: field định danh (name/feedback…) hiện PLAINTEXT ở local (S1) → decryptFieldOpt
 // chỉ giải mã nếu là ciphertext "v1:"; nếu plaintext thì trả nguyên (an toàn cả 2 chiều).
 
-/** Đọc studentId từ session Auth.js. Null nếu chưa đăng nhập. NGUỒN DUY NHẤT của studentId. */
-export async function getSessionStudentId(): Promise<string | null> {
+/**
+ * Đọc studentId từ session Auth.js. Null nếu chưa đăng nhập. NGUỒN DUY NHẤT của studentId.
+ * H2 (SPEC-SEC-1.2): phiên JWT không tự thu hồi được, nên ở đây kiểm thêm phía server:
+ *  - lms_user còn 'active' (giảng viên khoá học viên → phiên mất hiệu lực ngay);
+ *  - nếu phiên đăng nhập bằng mã: mã đó chưa hết hạn / chưa bị thu hồi (cấp mã mới → phiên cũ hết hiệu lực).
+ * Gói `cache()` để một request chỉ truy vấn một lần.
+ */
+export const getSessionStudentId = cache(async (): Promise<string | null> => {
   const session = await auth();
-  return session?.studentId ?? null;
-}
+  const studentId = session?.studentId;
+  if (!studentId) return null;
+  const me = await lmsDb
+    .select({ status: lmsUser.status })
+    .from(lmsUser)
+    .where(eq(lmsUser.studentId, studentId))
+    .limit(1);
+  if (!me[0] || me[0].status !== "active") return null;
+  if (session.accessCodeId) {
+    const code = await lmsDb
+      .select({ expiresAt: accessCode.expiresAt })
+      .from(accessCode)
+      .where(eq(accessCode.id, session.accessCodeId))
+      .limit(1);
+    if (!code[0] || (code[0].expiresAt != null && code[0].expiresAt < Date.now())) return null;
+  }
+  return studentId;
+});
 
 /** Giải mã an toàn: ciphertext v1 → plaintext; nếu đã là plaintext (local S1) → trả nguyên. */
 function safeDecrypt(value: string | null | undefined): string | null {
@@ -572,9 +596,9 @@ export async function linkVerifiedGoogleEmail(
   const existing = await lmsDb
     .select({ studentId: lmsUser.studentId })
     .from(lmsUser)
-    .where(eq(lmsUser.emailIndex, emailIdx))
+    .where(and(eq(lmsUser.emailIndex, emailIdx), ne(lmsUser.studentId, studentId)))
     .limit(1);
-  if (existing[0] && existing[0].studentId !== studentId) return { ok: false, reason: "taken" };
+  if (existing[0]) return { ok: false, reason: "taken" };
 
   await lmsDb
     .update(lmsUser)
@@ -586,6 +610,8 @@ export async function linkVerifiedGoogleEmail(
 /** Gỡ Gmail đã liên kết của học viên (SPEC-SEC-1.2 S08). Mã truy cập vẫn dùng được. */
 export async function unlinkGoogleEmail(studentId: string): Promise<void> {
   await lmsDb.update(lmsUser).set({ email: null, emailIndex: null }).where(eq(lmsUser.studentId, studentId));
+  const { logAccess } = await import("@/lib/lms/audit");
+  await logAccess({ actor: studentId, action: "unlink_gmail", targetType: "student" });
 }
 
 // ===== P-LMS-1: Tiến độ hoàn thành tài liệu =====

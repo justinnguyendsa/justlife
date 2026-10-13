@@ -27,6 +27,22 @@ describe("bộ chặn đoán mã theo khoá", () => {
     expect(t.isBlocked("ip-moi", 15 * MIN + 20)).toBe(false);
   });
 
+  it("đúng mã thì trả lại lượt đã tính", () => {
+    const t = make();
+    t.recordFail("ip-a", 1);
+    t.recordFail("ip-a", 2);
+    t.recordFail("ip-a", 3); // lượt thứ 3 hoá ra đúng mã
+    t.refund("ip-a");
+    expect(t.isBlocked("ip-a", 4)).toBe(false);
+  });
+
+  it("một nơi không đẩy được trần chung quá ngưỡng của riêng nó", () => {
+    const t = make(); // perKeyMax 3, globalMax 10
+    for (let i = 0; i < 50; i++) t.recordFail("ip-xau", i);
+    expect(t.isBlocked("ip-xau", 60)).toBe(true);
+    expect(t.isBlocked("ip-tot", 60)).toBe(false);
+  });
+
   it("giới hạn số khoá trong bộ nhớ", () => {
     const t = make();
     for (let i = 0; i < 3; i++) t.recordFail("ip-cu", i);

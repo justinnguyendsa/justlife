@@ -17,7 +17,8 @@ export function resolveRole(
   ownerAuthOn: boolean,
 ): ResolvedRole {
   if (user.studentId) return { role: "student", studentId: user.studentId };
-  if (!ownerAuthOn) return { role: "owner" };
+  // Owner-auth tắt: chỉ máy dev được coi là owner. Production thiếu cấu hình → không ai là owner (L1).
+  if (!ownerAuthOn) return process.env.NODE_ENV === "production" ? { role: null } : { role: "owner" };
   const owner = normalizeEmail(ownerEmail);
   const email = normalizeEmail(user.email);
   return owner && email && email === owner ? { role: "owner" } : { role: null };

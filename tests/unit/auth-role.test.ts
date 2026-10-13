@@ -18,4 +18,13 @@ describe("vai trò khi cấp phiên", () => {
   it("owner-auth tắt (máy local) giữ hành vi cũ", () => {
     expect(resolveRole({}, undefined, false)).toEqual({ role: "owner" });
   });
+  it("production thiếu cấu hình owner thì không ai là owner", () => {
+    const prev = process.env.NODE_ENV;
+    (process.env as Record<string, string>).NODE_ENV = "production";
+    try {
+      expect(resolveRole({ email: "ai@x.vn" }, undefined, false)).toEqual({ role: null });
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV = prev;
+    }
+  });
 });

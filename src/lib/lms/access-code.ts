@@ -9,7 +9,7 @@ import { createFailThrottle } from "@/lib/lms/fail-throttle";
 // - Sinh code mạnh bằng crypto.randomInt (KHÔNG Math.random, KHÔNG genId cho phần bí mật).
 // - Lưu HASH (sha256), KHÔNG lưu code thô. Trả code thô đúng 1 lần lúc cấp.
 // - verify: hash → tra (deterministic, dùng index) → trả studentId | null.
-// - Rate-limit tối thiểu cho local: đếm lần sai gần đây, khóa tạm sau N lần.
+// - Chặn đoán mã theo IP (fail-throttle), có trần chung; mã sai định dạng không tính lượt.
 // - Thông báo lỗi CHUNG (không tiết lộ "code tồn tại hay không") — chống enumeration.
 //
 // Schema thật: access_code.lmsUserId → lms_user.studentId (KHÔNG có cột studentId trực tiếp).
@@ -23,8 +23,9 @@ import { createFailThrottle } from "@/lib/lms/fail-throttle";
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 31 ký tự
 const GROUP_LEN = 4;
 const GROUPS = 2;
+const CODE_RE = new RegExp(`^[${ALPHABET}]{${GROUP_LEN}}-[${ALPHABET}]{${GROUP_LEN}}$`);
 
-const MAX_ATTEMPTS = 10; // sai quá ngưỡng (mỗi nơi truy cập) → khóa tạm nơi đó
+const MAX_ATTEMPTS = 20; // sai quá ngưỡng (mỗi nơi truy cập) → khóa tạm nơi đó (cả lớp có thể chung 1 IP)
 const GLOBAL_MAX_ATTEMPTS = 300; // ngưỡng chung rất cao — chặn tấn công dồn dập từ nhiều nơi
 const LOCK_MS = 15 * 60_000; // khóa 15 phút
 const DEFAULT_TTL_MS = 30 * 86_400_000; // mã sống 30 ngày (P5a; chốt lại ở go-live)
@@ -181,6 +182,7 @@ function constEqual(a: string, b: string): boolean {
 export interface VerifyResult {
   studentId: string;
   lmsUserId: string;
+  accessCodeId: string; // gắn vào phiên để thu hồi phiên khi mã bị thu hồi (SPEC-SEC-1.2 H2)
   isMinor: boolean;
 }
 
@@ -196,19 +198,21 @@ export interface VerifyResult {
 export async function verifyAccessCode(
   rawInput: string,
   opts?: { clientKey?: string },
-): Promise<VerifyResult | null> {
+): Promise<VerifyResult | { blocked: true } | null> {
   const now = Date.now();
+  // Khoá đếm = IP người gửi. Chỉ tin được x-forwarded-for khi chạy sau Vercel (Vercel ghi đè header này).
   const key = opts?.clientKey || "unknown";
-  const recordGlobalFail = (t: number) => throttle.recordFail(key, t);
-
-  // Nơi truy cập này nhập sai quá nhiều gần đây (hoặc bị dồn dập toàn cục) → từ chối ngay.
-  if (throttle.isBlocked(key, now)) return null;
+  // Nơi truy cập này nhập sai quá nhiều gần đây (hoặc bị dồn dập toàn cục) → báo "thử lại sau".
+  if (throttle.isBlocked(key, now)) return { blocked: true };
 
   const normalized = normalizeCode(rawInput);
-  if (normalized.length === 0) {
-    recordGlobalFail(now);
-    return null;
-  }
+  if (normalized.length === 0) return null;
+  // M2: sai định dạng thì không thể khớp mã nào → không truy vấn, không tính lượt (gõ nhầm không khoá cả lớp).
+  // Dev cho phép mã cố định khác định dạng (issueFixedAccessCodeForDev).
+  if (process.env.NODE_ENV === "production" && !CODE_RE.test(normalized)) return null;
+
+  // M1: tính lượt TRƯỚC khi truy vấn (bắn song song không né được bộ đếm); đúng mã thì trả lại.
+  throttle.recordFail(key, now);
 
   const hash = hashCode(normalized);
 
@@ -218,25 +222,21 @@ export async function verifyAccessCode(
 
   // Không tìm thấy code khớp hash → null (không tiết lộ). Đếm fail toàn cục.
   if (!row) {
-    recordGlobalFail(now);
     return null;
   }
 
   // Đối chiếu hằng-thời-gian (phòng so sánh không an toàn) — phải khớp tuyệt đối.
   if (!constEqual(row.codeHash, hash)) {
-    recordGlobalFail(now);
     return null;
   }
 
   // Code này đang bị khóa do nhập sai nhiều (per-code) → từ chối.
   if (row.lockedUntil && row.lockedUntil > now) {
-    recordGlobalFail(now);
     return null;
   }
 
   // Hết hạn → từ chối.
   if (row.expiresAt && row.expiresAt < now) {
-    recordGlobalFail(now);
     return null;
   }
 
@@ -254,11 +254,11 @@ export async function verifyAccessCode(
   )[0];
 
   if (!user || user.status !== "active") {
-    recordGlobalFail(now);
     return null;
   }
 
-  // Thành công: reset đếm sai per-code + khóa, cập nhật usedAt (vết "đã dùng gần nhất").
+  // Thành công: trả lại lượt đã tính, reset đếm sai per-code + khóa, cập nhật usedAt (vết "đã dùng gần nhất").
+  throttle.refund(key);
   await lmsDb
     .update(accessCode)
     .set({ attemptCount: 0, lockedUntil: null, usedAt: now })
@@ -267,6 +267,7 @@ export async function verifyAccessCode(
   return {
     studentId: user.studentId,
     lmsUserId: row.lmsUserId,
+    accessCodeId: row.id,
     isMinor: user.isMinor === 1,
   };
 }

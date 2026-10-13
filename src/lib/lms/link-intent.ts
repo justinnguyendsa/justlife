@@ -4,10 +4,15 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // Google" → server đặt cookie chứa studentId + hạn + HMAC. Ở callback Google, chỉ khi cookie hợp lệ
 // mới gắn email ĐÃ ĐƯỢC GOOGLE XÁC MINH vào đúng học viên đó. Không ai tự gõ email của người khác được.
 //
-// 🗣️ Bình dân: một "phiếu hẹn" có chữ ký, sống 10 phút, chứng minh chính học viên này vừa bấm liên kết.
+// Phiếu chỉ dùng được MỘT lần (signIn đọc rồi xoá ở mọi nhánh) và chỉ khi phiên hiện tại đúng là học viên đó.
+//
+// 🗣️ Bình dân: một "phiếu hẹn" có chữ ký, sống 5 phút, chứng minh chính học viên này vừa bấm liên kết.
 
 export const LINK_INTENT_COOKIE = "jl-gmail-link";
-export const LINK_INTENT_TTL_MS = 10 * 60_000;
+export const LINK_INTENT_TTL_MS = 5 * 60_000;
+
+/** Secret của Auth.js (chấp nhận cả tên cũ NEXTAUTH_SECRET). Rỗng → mọi phiếu bị từ chối (an toàn). */
+export const linkIntentSecret = () => process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 
 const deriveKey = (secret: string) => createHmac("sha256", secret).update("jl-gmail-link").digest();
 const mac = (key: Buffer, payload: string) => createHmac("sha256", key).update(payload).digest("base64url");

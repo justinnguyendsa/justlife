@@ -19,6 +19,7 @@ const NOTICES: Record<string, LinkNotice> = {
   owner: { ok: false, text: "Không thể liên kết địa chỉ này." },
   invalid: { ok: false, text: "Google không trả về địa chỉ Gmail hợp lệ." },
   no_student: { ok: false, text: "Tài khoản học viên chưa sẵn sàng — nhắn giảng viên giúp nhé." },
+  expired: { ok: false, text: "Phiên liên kết đã hết hạn — bấm Liên kết bằng Google lần nữa nhé." },
   error: { ok: false, text: "Chưa liên kết được, thử lại nhé." },
 };
 
@@ -45,7 +46,7 @@ export default async function ProfilePage({
     params.linked === "1" && profile.gmailLinked
       ? { ok: true, text: "Đã liên kết Gmail qua Google — lần sau có thể đăng nhập bằng Gmail." }
       : linkParam
-        ? (NOTICES[linkParam] ?? NOTICES.error)
+        ? (Object.hasOwn(NOTICES, linkParam) ? NOTICES[linkParam] : NOTICES.error)
         : null;
   const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 
