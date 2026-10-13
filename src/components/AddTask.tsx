@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Minus, Plus } from "lucide-react";
 
@@ -75,6 +75,26 @@ export function AddTask() {
   const [impact, setImpact] = useState(3);
   const [pending, start] = useTransition();
   const router = useRouter();
+
+  // Mở hộp từ nơi khác: nút "Thêm việc" ở thanh tiêu đề (sự kiện jl:add-task) và phím N
+  // khi không đang gõ chữ (SPEC-UI-P2.1 T07).
+  useEffect(() => {
+    const openDialog = () => setOpen(true);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "n" && e.key !== "N") return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      e.preventDefault();
+      setOpen(true);
+    };
+    window.addEventListener("jl:add-task", openDialog);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("jl:add-task", openDialog);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   const deadlineAt = deadline ? new Date(deadline + "T23:59:59").getTime() : null;
   const score = calcPriorityScore({ effort, impact, deadlineAt });

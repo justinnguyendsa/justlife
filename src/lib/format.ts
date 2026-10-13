@@ -12,6 +12,18 @@ export function fmtDayName(ms: number): string {
   return new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", timeZone: TZ }).format(ms);
 }
 
+// "Thứ Năm, 09/10" — dòng tóm tắt ở thanh tiêu đề.
+export function fmtDayShort(ms: number): string {
+  return new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: TZ }).format(ms);
+}
+
+// Thời lượng thân thiện: "45 phút", "1 giờ 30", "2 giờ".
+export function fmtDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60), m = Math.round(minutes % 60);
+  if (h === 0) return `${m} phút`;
+  return m === 0 ? `${h} giờ` : `${h} giờ ${String(m).padStart(2, "0")}`;
+}
+
 export function minToHHMM(min: number): string {
   const h = Math.floor(min / 60), m = min % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;

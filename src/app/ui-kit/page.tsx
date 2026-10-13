@@ -36,6 +36,10 @@ import { PageHeader } from "@/components/PageHeader";
 import { Section } from "@/components/Section";
 import { TaskCard } from "@/components/TaskCard";
 import { AREA_VAR } from "@/lib/areas";
+import { NowCard } from "@/app/(app)/today/NowCard";
+import { TaskRow } from "@/app/(app)/today/TaskRow";
+import { HabitsToday } from "@/app/(app)/today/HabitsToday";
+import { RestToday } from "@/app/(app)/today/RestToday";
 
 export const metadata: Metadata = {
   title: "Bộ UI · justlife",
@@ -276,6 +280,28 @@ export default function UiKitPage() {
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-20 w-full" />
+        </div>
+      </Block>
+
+      <Block title="Hôm nay — thành phần P2.1 (dữ liệu mẫu, bấm sẽ không lưu)">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="flex flex-col gap-4">
+            <NowCard task={sampleTask({ title: "Chuẩn bị báo cáo doanh thu tuần", status: "doing", deadlineAt: NOW + 2 * 3600_000 })} doing extra={1} now={NOW} />
+            <NowCard task={sampleTask({ title: "Đọc chương 4 — Hồi quy logistic", area: "study", priorityScore: 74 })} doing={false} extra={0} now={NOW} />
+            <NowCard task={null} doing={false} extra={0} now={NOW} />
+            <TaskRow task={sampleTask({ title: "Chấm bài tập lớp Python buổi 5", area: "teach", priorityScore: 88, deadlineAt: NOW + 5 * 3600_000 })} now={NOW} />
+            <TaskRow task={sampleTask({ title: "Gửi số liệu tồn kho", area: "work", priorityScore: 71, deadlineAt: NOW - 26 * 3600_000 })} now={NOW} />
+            <TaskRow task={sampleTask({ title: "Chạy bộ 5 km", area: "growth", priorityScore: 40 })} now={NOW} compact />
+            <HabitsToday variant="chips" habits={[{ id: "h1", name: "Tiếng Anh", streak: 12, doneToday: true }, { id: "h2", name: "Chạy bộ", streak: 3, doneToday: false }]} />
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="bg-card rounded-lg border p-4">
+              <HabitsToday variant="list" habits={[{ id: "h1", name: "Tiếng Anh 20 phút", streak: 12, doneToday: true }, { id: "h2", name: "Chạy bộ", streak: 3, doneToday: false }, { id: "h3", name: "Ngủ trước 23:30", streak: 0, doneToday: false }]} />
+            </div>
+            <div className="bg-card rounded-lg border p-4">
+              <RestToday todayMin={15} />
+            </div>
+          </div>
         </div>
       </Block>
 
