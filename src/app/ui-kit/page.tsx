@@ -248,7 +248,7 @@ export default function UiKitPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="a">Mảng</Label>
-            <Select>
+            <Select items={{ work: "Công việc", teach: "Dạy học", study: "Học tập", growth: "Phát triển" }}>
               <SelectTrigger id="a" className="w-full">
                 <SelectValue placeholder="Chọn mảng" />
               </SelectTrigger>
