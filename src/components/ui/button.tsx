@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
@@ -37,17 +37,16 @@ const buttonVariants = cva(
   }
 );
 
+// Base UI Button (ADR-005 3c.1). Mặc định type="button" — nút gửi form phải ghi type="submit".
+// Link trông như nút: dùng `buttonVariants` trên <Link>, KHÔNG bọc Button (Base UI luôn đặt role=button).
 function Button({
   className,
   variant,
   size,
-  asChild = false,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "button";
+}: Omit<ButtonPrimitive.Props, "className"> & { className?: string } & VariantProps<typeof buttonVariants>) {
   return (
-    <Comp
+    <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}

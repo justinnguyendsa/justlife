@@ -26,7 +26,8 @@ import {
 } from "@/lib/focus-timer";
 import { toast } from "@/components/Toaster";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
 type Clock = FocusClock;
@@ -177,9 +178,9 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between gap-3 px-3 pt-4 md:px-7 md:pt-5">
-        <Button asChild variant="ghost" size="sm" className="h-11 md:h-9">
-          <Link href="/today"><ChevronLeft aria-hidden="true" />Thoát tập trung</Link>
-        </Button>
+        <Link href="/today" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-11 md:h-9")}>
+          <ChevronLeft aria-hidden="true" />Thoát tập trung
+        </Link>
         {mounted && (
           <span className="text-muted-foreground pr-2 text-xs md:text-[13px]">
             Phiên {sessionNo} trên {SESSIONS_PER_DAY}
@@ -194,8 +195,8 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
             <h1 className="text-2xl font-bold tracking-tight">Không có việc nào đang làm</h1>
             <p className="text-muted-foreground text-sm">Chọn một việc để bắt đầu phiên tập trung.</p>
             <div className="flex gap-2">
-              <Button asChild className="h-11 md:h-10"><Link href="/today">Về Hôm nay</Link></Button>
-              <Button asChild variant="outline" className="h-11 md:h-10"><Link href="/tasks">Mở Việc</Link></Button>
+              <Link href="/today" className={cn(buttonVariants(), "h-11 md:h-10")}>Về Hôm nay</Link>
+              <Link href="/tasks" className={cn(buttonVariants({ variant: "outline" }), "h-11 md:h-10")}>Mở Việc</Link>
             </div>
           </div>
         ) : (
