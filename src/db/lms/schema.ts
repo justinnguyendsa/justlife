@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
 
 // ===== lms.db — Phase 5 (LMS-lite multi-user, TÁCH khỏi personal.db) =====
 // ADR-002 + SPEC-P5a. R-JL-TWO-FACES-01 / R-JL-STUDENT-PII-01.
@@ -413,4 +413,17 @@ export type TcCodeRun = typeof tcCodeRun.$inferSelect;
 export type TcThread = typeof tcThread.$inferSelect;
 export type TcPost = typeof tcPost.$inferSelect;
 export type ClassEnrolCode = typeof classEnrolCode.$inferSelect;
+
+// ---- ADR-005 3e: bộ chặn đoán mã lưu bền (src/lib/lms/login-throttle.ts truy vấn bằng SQL thô) ----
+// key_hash = HMAC(khoá con từ AUTH_SECRET, IP hoặc dải IPv6 /64) — KHÔNG lưu IP thô. Hàng cũ hơn 2 cửa sổ
+// 15 phút bị dọn ở lượt thử đăng nhập kế tiếp (lâu không ai đăng nhập thì nằm lại: chỉ là khoá băm + số đếm).
+export const authThrottle = sqliteTable(
+  "auth_throttle",
+  {
+    keyHash: text("key_hash").notNull(),
+    windowStart: integer("window_start").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.keyHash, t.windowStart] })],
+);
 

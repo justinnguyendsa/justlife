@@ -85,6 +85,7 @@ export default async function setup(project: TestProject) {
   project.provide("smokeMisconfigured", `http://localhost:${PORT_MISCONFIGURED}`);
   project.provide("smokeCode", code);
   project.provide("smokeSecret", secret);
+  project.provide("smokeLmsDb", env.LMS_DATABASE_URL!);
 
   return () => {
     for (const s of servers) s.kill();
@@ -102,5 +103,6 @@ declare module "vitest" {
     smokeMisconfigured: string;
     smokeCode: string;
     smokeSecret: string;
+    smokeLmsDb: string;
   }
 }

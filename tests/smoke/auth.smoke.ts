@@ -1,5 +1,7 @@
 import { describe, expect, inject, it } from "vitest";
+import { createClient } from "@libsql/client";
 import { encode } from "@auth/core/jwt";
+import { hashThrottleKey } from "@/lib/lms/login-throttle";
 
 // ADR-005 3a §7.9 — cổng đăng nhập trên bản build production thật (`next start`).
 // Đây là cách tự động DUY NHẤT chứng minh middleware (sau này là proxy ở Next 16) thật sự được nhận
@@ -9,6 +11,7 @@ const BASE = inject("smokeBase");
 const BAD = inject("smokeMisconfigured");
 const CODE = inject("smokeCode");
 const SECRET = inject("smokeSecret");
+const LMS_DB = inject("smokeLmsDb");
 const OWNER = "owner@example.test";
 const COOKIE = "authjs.session-token"; // http://localhost → tên cookie không có tiền tố __Secure-
 
@@ -31,15 +34,23 @@ const jar = (r: Response) => {
   return [...m.values()];
 };
 
-async function studentCookie(): Promise<string> {
+async function postCode(code: string, ip?: string): Promise<Response> {
   const csrf = await fetch(`${BASE}/api/auth/csrf`);
   const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-  const res = await fetch(`${BASE}/api/auth/callback/access-code`, {
+  return fetch(`${BASE}/api/auth/callback/access-code`, {
     method: "POST",
     redirect: "manual",
-    headers: { "content-type": "application/x-www-form-urlencoded", cookie: jar(csrf).join("; ") },
-    body: new URLSearchParams({ code: CODE, csrfToken, callbackUrl: `${BASE}/portal` }),
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: jar(csrf).join("; "),
+      ...(ip ? { "x-forwarded-for": ip } : {}),
+    },
+    body: new URLSearchParams({ code, csrfToken, callbackUrl: `${BASE}/portal` }),
   });
+}
+
+async function studentCookie(): Promise<string> {
+  const res = await postCode(CODE);
   const session = jar(res).find((c) => c.startsWith(`${COOKIE}=`));
   if (!session) throw new Error(`[smoke] đăng nhập mã không tạo phiên (status ${res.status})`);
   return session;
@@ -79,6 +90,22 @@ describe("cloud — đăng nhập", () => {
     expect((await get(BASE, "/portal", c)).status).toBe(200);
     expect(where(await get(BASE, "/today", c))).toBe("/login?error=WrongRole");
     expect((await get(BASE, "/api/personal/tasks", c)).status).toBe(401);
+  });
+
+  it("mã sai → đếm vào bảng auth_throttle (lưu bền, không IP thô), không lỗi máy chủ", async () => {
+    const ip = "198.51.100.77";
+    const res = await postCode("ZZZZ-ZZZZ", ip);
+    expect(res.status).toBeLessThan(500);
+    expect(jar(res).some((c) => c.startsWith(`${COOKIE}=`))).toBe(false);
+    const db = createClient({ url: LMS_DB });
+    try {
+      const rows = (await db.execute("SELECT key_hash, count FROM auth_throttle")).rows;
+      expect(rows.some((r) => r.key_hash === "__global__" && Number(r.count) >= 1)).toBe(true);
+      expect(rows.some((r) => r.key_hash === hashThrottleKey(ip, SECRET))).toBe(true); // HMAC với AUTH_SECRET thật
+      expect(rows.every((r) => /^(__global__|[0-9a-f]{64})$/.test(String(r.key_hash)))).toBe(true);
+    } finally {
+      db.close();
+    }
   });
 
   it("owner (cookie mã hoá thật) → vào khu cá nhân và API", async () => {
