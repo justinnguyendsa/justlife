@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { fixedSchedule, timeBlock, task } from "@/db/schema";
 import { startOfDay, startOfWeek } from "@/lib/scheduler";
 import { CalendarClient } from "./CalendarClient";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function CalendarPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const params = searchParams ? await searchParams : {};
   const now = Date.now();
 

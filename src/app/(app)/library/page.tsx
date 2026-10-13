@@ -3,12 +3,14 @@ import { listClasses } from "@/db/teaching";
 import { listCourses } from "@/db/study";
 import { PageHeader } from "@/components/PageHeader";
 import { LibraryClient } from "./LibraryClient";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 // Thư viện tài liệu (gốc): cây folder + file (upload/link) dùng chung Học & Dạy.
 // Đọc nội dung folder gốc + danh sách lớp/môn để gắn file, trao cho island LibraryClient.
 export default async function LibraryPage() {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const [data, classes, courses] = await Promise.all([
     getFolder(null),
     listClasses(),

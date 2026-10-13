@@ -6,12 +6,14 @@ import { getFilesForCourse } from "@/db/library";
 import { PageHeader } from "@/components/PageHeader";
 import { LinkedFiles } from "@/components/LinkedFiles";
 import { CourseDetailClient } from "./CourseDetailClient";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 // Chi tiết môn học: 2 tab — "Bài tập & Đồ án" (item + deadline + trạng thái)
 // và "Ghi chú & tài liệu" (note + link). Dữ liệu nhỏ → nạp sẵn ở server.
 export default async function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const { id } = await params;
   const [detail, files] = await Promise.all([getCourseDetail(id), getFilesForCourse(id)]);
   if (!detail) notFound();

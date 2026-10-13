@@ -3,12 +3,14 @@ import { ChevronLeft } from "lucide-react";
 import { getRest } from "@/db/habits";
 import { PageHeader } from "@/components/PageHeader";
 import { RestClient } from "./RestClient";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 // Màn "Nghỉ ngơi" (trụ #4 — nghỉ chủ động chống burnout): tóm tắt hôm nay/tuần + thêm khối nghỉ nhanh.
 // Đọc dữ liệu phía server (todayBlocks/todayMin/weekMin), trao cho island RestClient.
 export default async function RestPage() {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const rest = await getRest(Date.now());
   return (
     <>

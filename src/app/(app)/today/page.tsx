@@ -14,6 +14,7 @@ import { NowCard } from "./NowCard";
 import { TaskRow } from "./TaskRow";
 import { HabitsToday } from "./HabitsToday";
 import { RestToday } from "./RestToday";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ type Slot = { kind: "fixed" | "block" | "free"; label: string; area: string; sta
 // Màn Hôm nay (SPEC-UI-P2.1, canvas J01). Web: 2 cột (nội dung | lịch · thói quen · nghỉ).
 // Điện thoại: Đang làm → Ưu tiên → Hạn → Thói quen → Tiếp theo trên lịch.
 export default async function TodayPage() {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const now = Date.now();
   const [{ doing, top, blocks, fixed }, deadlines, habits, rest] = await Promise.all([
     getTodayData(now),

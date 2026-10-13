@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Flame, Moon, BookOpen, ChevronRight, Sprout } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,8 @@ const HUBS = [
   },
 ];
 
-export default function DevelopPage() {
+export default async function DevelopPage() {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   return (
     <>
       <PageHeader title="Cuộc sống" sub="Thói quen · nghỉ ngơi · học" />

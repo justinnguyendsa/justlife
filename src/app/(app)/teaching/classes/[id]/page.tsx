@@ -6,6 +6,7 @@ import { getFilesForClass } from "@/db/library";
 import { PageHeader } from "@/components/PageHeader";
 import { LinkedFiles } from "@/components/LinkedFiles";
 import { ClassDetailClient } from "./ClassDetailClient";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 // (dữ liệu nhỏ) để client đổi buổi/bài tập không cần gọi query riêng.
 // Dữ liệu lấy theo số truy vấn cố định, không tăng theo số buổi/bài tập (SPEC-Perf-P1 T08).
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const { id } = await params;
   const [bundle, files] = await Promise.all([getClassDetailBundle(id), getFilesForClass(id)]);
   if (!bundle) notFound();

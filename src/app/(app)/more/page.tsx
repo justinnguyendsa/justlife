@@ -9,6 +9,7 @@ import { minToHHMM } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { ThemeSetting } from "@/components/ThemeSetting";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ const ITEMS = [
 ];
 
 export default async function MorePage() {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const fixed = await db.select().from(fixedSchedule).orderBy(asc(fixedSchedule.startMin));
   return (
     <>
