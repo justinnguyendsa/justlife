@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { resolveRole } from "@/lib/auth-role";
 
 // ⚙️ Cấu hình Auth.js v5 — phần KHÔNG phụ thuộc Node runtime (an toàn cho middleware/Edge).
 // Provider được nạp ở `auth.ts` (cần node:crypto qua verifyAccessCode / Google OAuth) — KHÔNG để ở đây.
@@ -79,17 +80,19 @@ export const authConfig = {
       if (user) {
         // Phân biệt bằng tín hiệu ĐÁNG TIN, KHÔNG dựa account.provider (Auth.js v5 beta có thể KHÔNG
         // khớp "google" trên luồng OAuth → trước đây gán nhầm role="student" cho chủ sở hữu).
-        //  - Học viên: authorize() của access-code trả về studentId.
-        //  - Chủ sở hữu (Google): KHÔNG có studentId. signIn (auth.ts) đã CHẶN trước — chỉ cho qua khi
-        //    email === OWNER_EMAIL — nên user không-studentId tới được đây ⟹ chính là owner.
-        const u = user as { studentId?: string; lmsUserId?: string; isMinor?: boolean };
-        if (u.studentId) {
-          token.studentId = u.studentId;
+        //  - Học viên: authorize() / signIn gắn studentId.
+        //  - Chủ sở hữu: CHỈ khi email trùng OWNER_EMAIL (SPEC-SEC-1.2 S09). Trước đây "không có
+        //    studentId ⟹ owner" — một sơ suất ở signIn là thành leo quyền. Giờ an toàn kép thật sự.
+        //  - Còn lại: không có vai trò nào → middleware coi như chưa đăng nhập.
+        const u = user as { studentId?: string; lmsUserId?: string; isMinor?: boolean; email?: string | null };
+        const r = resolveRole(u, process.env.OWNER_EMAIL, ownerAuthEnabledEnv());
+        if (r.role === "student") {
+          token.studentId = r.studentId;
           token.lmsUserId = u.lmsUserId;
           token.isMinor = u.isMinor;
           token.role = "student";
         } else {
-          token.role = "owner";
+          token.role = r.role ?? undefined;
           token.studentId = undefined;
           token.lmsUserId = undefined;
           token.isMinor = undefined;

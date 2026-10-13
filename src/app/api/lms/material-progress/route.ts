@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import { tcMaterialProgress } from "@/db/lms/schema";
-import { getSessionStudentId } from "@/lib/lms/portal-queries";
+import { assertCanSeeMaterialId, getSessionStudentId } from "@/lib/lms/portal-queries";
 import { genId } from "@/lib/id";
 
 // POST /api/lms/material-progress — toggle hoàn thành tài liệu (P-LMS-1).
 // Bất biến:
 //  - studentId TỪ session (nguồn duy nhất — chống IDOR).
+//  - Cổng đồng ý (HV chưa thành niên cần đồng ý phụ huynh) + tài liệu phải thuộc lớp HV, visibility
+//    'class' (SPEC-SEC-1.2 S10) — giống route tải tài liệu.
 //  - Chỉ chạm lmsDb (R-JL-TWO-FACES-01).
 //  - completed=true → upsert; completed=false → delete record.
 //
@@ -33,6 +35,21 @@ export async function POST(req: NextRequest) {
   const { materialId, completed } = body;
   if (!materialId || typeof materialId !== "string") {
     return err("Thiếu materialId.", 400);
+  }
+
+  // Consent enforcement: API-level gate, không chỉ UI (giống /api/lms/material/[ref]).
+  const { hasValidConsent, getIsMinor } = await import("@/lib/lms/consent");
+  const { auth: getAuth } = await import("@/auth");
+  const session = await getAuth();
+  const isMinor = session?.isMinor ?? (await getIsMinor(studentId));
+  if (!(await hasValidConsent(studentId, isMinor))) {
+    return err("Bạn cần hoàn tất đồng ý xử lý dữ liệu.", 403);
+  }
+
+  try {
+    await assertCanSeeMaterialId(studentId, materialId);
+  } catch {
+    return err("Không có quyền với tài liệu này.", 403);
   }
 
   if (completed) {

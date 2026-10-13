@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { GraduationCap, CheckCircle2, AlertCircle, Link2 } from "lucide-react";
-import { linkGoogleEmailAction } from "./actions";
+import { useRouter } from "next/navigation";
+import { GraduationCap, CheckCircle2, AlertCircle, Link2, Unlink } from "lucide-react";
+import { startGmailLink, unlinkGmail } from "./actions";
 
-// Client island: hiển thị hồ sơ học viên + form liên kết Gmail.
-// KHÔNG đọc DB trực tiếp — dữ liệu từ server component (page.tsx).
+// Client island: hiển thị hồ sơ học viên + liên kết Gmail QUA GOOGLE (SPEC-SEC-1.2 S11).
+// KHÔNG đọc DB trực tiếp — dữ liệu từ server component (page.tsx); email nhận vào đã che sẵn.
+
+export type LinkNotice = { ok: boolean; text: string };
 
 type Profile = {
   name: string;
@@ -20,40 +23,36 @@ type Stats = {
   attendedCount: number;
 };
 
-/** Che bớt địa chỉ email: "ten@gmail.com" → "te***@gmail.com" */
-function maskEmail(email: string | null): string {
-  if (!email) return "";
-  const [u, d] = email.split("@");
-  if (!u || !d) return email;
-  return u.slice(0, 2) + "***@" + d;
-}
-
 export function ProfileClient({
   profile,
   stats,
+  googleEnabled,
+  notice,
 }: {
   profile: Profile;
   stats: Stats;
+  googleEnabled: boolean;
+  notice: LinkNotice | null;
 }) {
-  const [email, setEmail] = useState("");
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const router = useRouter();
+  const [msg, setMsg] = useState<LinkNotice | null>(notice);
   const [pending, start] = useTransition();
 
-  function handleLink(e: React.FormEvent) {
-    e.preventDefault();
+  function handleUnlink() {
     setMsg(null);
     start(async () => {
-      const res = await linkGoogleEmailAction(email);
-      setMsg({
-        ok: res.ok,
-        text:
-          res.error ??
-          (res.ok
-            ? "Liên kết thành công! Lần tới bạn có thể đăng nhập bằng Gmail."
-            : ""),
-      });
+      const res = await unlinkGmail();
+      setMsg(res.ok ? { ok: true, text: "Đã gỡ liên kết Gmail. Mã truy cập vẫn dùng được." } : { ok: false, text: res.error ?? "Chưa gỡ được, thử lại nhé." });
+      if (res.ok) router.refresh();
     });
   }
+
+  const notice_ = msg && (
+    <div className={`portal-err${msg.ok ? " ok" : ""}`} role="alert" style={{ marginBottom: 12 }}>
+      {msg.ok ? <CheckCircle2 strokeWidth={2} aria-hidden /> : <AlertCircle strokeWidth={2} aria-hidden />}
+      <span>{msg.text}</span>
+    </div>
+  );
 
   return (
     <>
@@ -152,70 +151,33 @@ export function ProfileClient({
         </h2>
       </div>
       <div className="card">
+        {notice_}
         {profile.gmailLinked ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <CheckCircle2
-              strokeWidth={2}
-              style={{ color: "var(--ok, #16a34a)", flexShrink: 0 }}
-            />
-            <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <CheckCircle2 strokeWidth={2} style={{ color: "var(--success)", flexShrink: 0 }} aria-hidden />
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600 }}>Gmail đã liên kết</div>
-              <div className="portal-sub">
-                {maskEmail(profile.gmailEmail)} — Lần tới có thể đăng nhập
-                bằng Gmail.
-              </div>
+              <div className="portal-sub">{profile.gmailEmail} · đã xác minh qua Google</div>
             </div>
+            <button type="button" className="btn line sm" onClick={handleUnlink} disabled={pending}>
+              <Unlink strokeWidth={2} aria-hidden />
+              {pending ? "Đang gỡ…" : "Gỡ liên kết"}
+            </button>
           </div>
-        ) : (
+        ) : googleEnabled ? (
           <>
-            <p
-              style={{
-                marginBottom: 12,
-                color: "var(--text-secondary)",
-                fontSize: 13,
-              }}
-            >
-              Đăng ký Gmail để lần sau đăng nhập dễ hơn (không cần mã truy
-              cập).
+            <p className="portal-sub" style={{ marginBottom: 12 }}>
+              Liên kết Gmail để lần sau đăng nhập không cần mã truy cập. Google sẽ hỏi bạn chọn đúng tài khoản Gmail của mình.
             </p>
-            {msg && (
-              <div
-                className={`portal-err${msg.ok ? " ok" : ""}`}
-                role="alert"
-                style={{ marginBottom: 12 }}
-              >
-                {msg.ok ? (
-                  <CheckCircle2 strokeWidth={2} aria-hidden />
-                ) : (
-                  <AlertCircle strokeWidth={2} aria-hidden />
-                )}
-                <span>{msg.text}</span>
-              </div>
-            )}
-            <form onSubmit={handleLink}>
-              <div className="field">
-                <label htmlFor="gmail">Địa chỉ Gmail</label>
-                <input
-                  id="gmail"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ten@gmail.com"
-                  required
-                  disabled={pending}
-                  autoComplete="email"
-                />
-              </div>
-              <button
-                type="submit"
-                className="btn primary block"
-                disabled={pending}
-              >
+            <form action={startGmailLink}>
+              <button type="submit" className="btn primary block">
                 <Link2 strokeWidth={2} aria-hidden />
-                {pending ? "Đang lưu…" : "Liên kết Gmail"}
+                Liên kết bằng Google
               </button>
             </form>
           </>
+        ) : (
+          <p className="portal-sub">Đăng nhập bằng Gmail chưa được bật. Bạn vẫn dùng mã truy cập như bình thường.</p>
         )}
       </div>
 

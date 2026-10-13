@@ -2,7 +2,6 @@ import { and, asc, desc, eq, inArray, gte } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import {
   enrollment,
-  lmsPerson,
   lmsUser,
   tcAssignment,
   tcAttendance,
@@ -16,7 +15,6 @@ import {
   tcProgress,
   tcQuiz,
   tcQuizAttempt,
-  tcQuizQuestion,
   tcSession,
   tcStudent,
   tcSubmission,
@@ -229,6 +227,24 @@ export async function assertCanAccessMaterial(studentId: string, fileRef: string
     .select()
     .from(tcMaterial)
     .where(eq(tcMaterial.fileRef, fileRef))
+    .limit(1);
+  const m = rows[0];
+  if (!m || !ids.includes(m.classId) || m.visibility !== "class") {
+    throw new Error("FORBIDDEN: không có quyền với tài liệu này.");
+  }
+  return m;
+}
+
+/**
+ * Ném lỗi nếu học viên KHÔNG được thấy tài liệu theo materialId (SPEC-SEC-1.2 S10): tài liệu phải thuộc
+ * lớp HV là thành viên + visibility='class'. Cùng một lỗi cho không tồn tại và không có quyền.
+ */
+export async function assertCanSeeMaterialId(studentId: string, materialId: string) {
+  const ids = await myClassIds(studentId);
+  const rows = await lmsDb
+    .select({ id: tcMaterial.id, classId: tcMaterial.classId, visibility: tcMaterial.visibility })
+    .from(tcMaterial)
+    .where(eq(tcMaterial.id, materialId))
     .limit(1);
   const m = rows[0];
   if (!m || !ids.includes(m.classId) || m.visibility !== "class") {
@@ -529,41 +545,47 @@ export async function getMyProfile(studentId: string) {
 }
 
 /**
- * Lưu Gmail liên kết (mã hóa + blind-index).
- * Bất biến bảo mật: kiểm tra trùng bằng emailIndex, không giải mã toàn bộ.
+ * Gắn Gmail ĐÃ ĐƯỢC GOOGLE XÁC MINH vào học viên (SPEC-SEC-1.2 S07). CHỈ gọi từ signIn callback,
+ * sau khi phiếu ý định liên kết (link-intent) hợp lệ — không bao giờ nhận email gõ tay.
+ * Bất biến: kiểm trùng bằng emailIndex (không giải mã), không gắn email chủ sở hữu, học viên phải active.
+ * Trước đây `linkGoogleEmail` nhận chuỗi tuỳ ý → ai cũng chiếm trước được Gmail của người khác.
  */
-export async function linkGoogleEmail(
+export async function linkVerifiedGoogleEmail(
   studentId: string,
-  gmail: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const normalized = gmail.trim().toLowerCase();
-  if (!normalized.includes("@")) return { ok: false, error: "Email không hợp lệ." };
+  verifiedEmail: string,
+  ownerEmail: string,
+): Promise<{ ok: true } | { ok: false; reason: "invalid" | "owner" | "taken" | "no_student" }> {
+  const normalized = verifiedEmail.trim().toLowerCase();
+  if (!normalized.includes("@")) return { ok: false, reason: "invalid" };
+  if (ownerEmail && normalized === ownerEmail.trim().toLowerCase()) return { ok: false, reason: "owner" };
 
-  try {
-    // Import crypto (Node runtime only — portal-queries chạy server-side)
-    const { encryptFieldOpt, blindIndex } = await import("@/lib/lms/crypto");
-    const emailCipher = encryptFieldOpt(normalized);
-    const emailIdx = blindIndex(normalized);
+  const { encryptFieldOpt, blindIndex } = await import("@/lib/lms/crypto");
+  const emailIdx = blindIndex(normalized);
 
-    // Kiểm tra email đã liên kết với tài khoản khác chưa (chống trùng)
-    const existing = await lmsDb
-      .select({ id: lmsUser.id, studentId: lmsUser.studentId })
-      .from(lmsUser)
-      .where(eq(lmsUser.emailIndex, emailIdx!))
-      .limit(1);
-    if (existing[0] && existing[0].studentId !== studentId) {
-      return { ok: false, error: "Gmail này đã được liên kết với tài khoản khác." };
-    }
+  const me = await lmsDb
+    .select({ id: lmsUser.id, status: lmsUser.status })
+    .from(lmsUser)
+    .where(eq(lmsUser.studentId, studentId))
+    .limit(1);
+  if (!me[0] || me[0].status !== "active") return { ok: false, reason: "no_student" };
 
-    await lmsDb
-      .update(lmsUser)
-      .set({ email: emailCipher, emailIndex: emailIdx })
-      .where(eq(lmsUser.studentId, studentId));
-    return { ok: true };
-  } catch (e) {
-    console.error("[linkGoogleEmail]", e);
-    return { ok: false, error: "Không thể lưu. Vui lòng thử lại." };
-  }
+  const existing = await lmsDb
+    .select({ studentId: lmsUser.studentId })
+    .from(lmsUser)
+    .where(eq(lmsUser.emailIndex, emailIdx))
+    .limit(1);
+  if (existing[0] && existing[0].studentId !== studentId) return { ok: false, reason: "taken" };
+
+  await lmsDb
+    .update(lmsUser)
+    .set({ email: encryptFieldOpt(normalized), emailIndex: emailIdx })
+    .where(eq(lmsUser.studentId, studentId));
+  return { ok: true };
+}
+
+/** Gỡ Gmail đã liên kết của học viên (SPEC-SEC-1.2 S08). Mã truy cập vẫn dùng được. */
+export async function unlinkGoogleEmail(studentId: string): Promise<void> {
+  await lmsDb.update(lmsUser).set({ email: null, emailIndex: null }).where(eq(lmsUser.studentId, studentId));
 }
 
 // ===== P-LMS-1: Tiến độ hoàn thành tài liệu =====

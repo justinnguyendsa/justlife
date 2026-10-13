@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import type { Provider } from "next-auth/providers";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
-import { authConfig, ownerAuthEnabledEnv } from "./auth.config";
+import { authConfig } from "./auth.config";
 import { verifyAccessCode } from "@/lib/lms/access-code";
 
 // 🔐 Auth.js v5 — entrypoint server (có Node runtime → dùng được verifyAccessCode/node:crypto/OAuth).
@@ -22,10 +22,13 @@ const accessCodeProvider = Credentials({
   credentials: {
     code: { label: "Mã truy cập", type: "text" },
   },
-  async authorize(credentials) {
+  async authorize(credentials, request) {
     const code = typeof credentials?.code === "string" ? credentials.code : "";
     if (!code) return null;
-    const result = await verifyAccessCode(code);
+    // Khoá chặn đoán mã theo nơi truy cập (SPEC-SEC-1.2 S04). Vercel đặt x-forwarded-for.
+    const fwd = request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const clientKey = fwd || request?.headers?.get("x-real-ip")?.trim() || "unknown";
+    const result = await verifyAccessCode(code, { clientKey });
     if (!result) return null; // sai / hết hạn / khóa → CHUNG (không tiết lộ)
     // Trả về danh tính tối thiểu — callback jwt sẽ gắn vào token.
     return {
@@ -58,7 +61,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     //  - Google: CHỈ cho qua nếu email khớp OWNER_EMAIL → người lạ bị từ chối ngay (return false),
     //    KHÔNG tạo phiên, KHÔNG vào được Personal/Dạy học. (Linking học viên-Google làm ở bước sau.)
     //  - access-code: giữ nguyên (authorize đã kiểm mã) → cho qua.
-    async signIn({ account, profile, user }) {
+    async signIn({ profile, user }) {
       // Học viên (access-code) mang studentId từ authorize() → đã xác thực, cho qua.
       const u = user as { studentId?: string } | undefined;
       if (u?.studentId) return true;
@@ -71,12 +74,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const ok = Boolean(owner && email && email === owner && verified);
       // Log lần thử đăng nhập thất bại (minimal, KHÔNG lưu email đầy đủ).
       if (!ok) {
-        // Học viên đăng nhập bằng Gmail (sau khi đã liên kết bằng linkGoogleEmail).
+        // Học viên đăng nhập bằng Gmail (sau khi đã liên kết qua Google — linkVerifiedGoogleEmail).
         // Bất biến bảo mật:
         //  - Chỉ lookup bằng emailIndex (blind-index, không giải mã email thô).
         //  - Chỉ cho vào nếu status === 'active' và có studentId.
         //  - Nếu không tìm thấy → tiếp tục return false (từ chối).
         if (email && verified) {
+          // Liên kết Gmail ĐÃ XÁC MINH (SPEC-SEC-1.2 S07): chỉ khi học viên vừa bấm "Liên kết bằng
+          // Google" (phiếu ý định có ký, còn hạn). Gắn xong thì đi tiếp đường tra emailIndex bên dưới.
+          try {
+            const { cookies } = await import("next/headers");
+            const { LINK_INTENT_COOKIE, verifyIntent } = await import("@/lib/lms/link-intent");
+            const jar = await cookies();
+            const intent = jar.get(LINK_INTENT_COOKIE)?.value;
+            if (intent) {
+              const secret = process.env.AUTH_SECRET ?? "";
+              const intentStudentId = verifyIntent(intent, Date.now(), secret);
+              try {
+                jar.delete({ name: LINK_INTENT_COOKIE, path: "/api/auth" });
+              } catch {
+                /* không xoá được cookie ở ngữ cảnh này — phiếu tự hết hạn sau 10 phút */
+              }
+              if (intentStudentId) {
+                const { linkVerifiedGoogleEmail } = await import("@/lib/lms/portal-queries");
+                const linked = await linkVerifiedGoogleEmail(intentStudentId, email, owner ?? "");
+                if (!linked.ok) {
+                  console.error("[student-gmail-link] REJECT", { reason: linked.reason });
+                  // Về lại Hồ sơ kèm lý do (phiên học viên cũ vẫn giữ nguyên, không tạo phiên mới).
+                  return `/portal/profile?link=${linked.reason}`;
+                }
+              }
+            }
+          } catch (e) {
+            console.error("[student-gmail-link] error", e);
+            return "/portal/profile?link=error";
+          }
           try {
             const { blindIndex } = await import("@/lib/lms/crypto");
             const { lmsDb } = await import("@/db/lms/client");
