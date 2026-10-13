@@ -44,8 +44,17 @@
 | L11 | Ghi nhận | Phiên học viên mang tên, email, ảnh Google. | Xoá `name`, `email`, `picture` khỏi token học viên. |
 | L12 | Ghi nhận | Liên kết và gỡ Gmail không có audit. Phiếu chỉ đọc `AUTH_SECRET`. | Thêm audit `link_gmail` / `unlink_gmail`. Nhận cả `NEXTAUTH_SECRET`. Test luồng signIn và DB để giai đoạn 3 (test bảo vệ đăng nhập). |
 
+## Soát lại lần 2 (commit `e37f543`)
+privacy-auditor: **PASS, merge được**, 0 lỗi chặn. H1, M1, M2, M4 và các lỗi Thấp đã sửa đúng. Đăng nhập của chủ sở hữu không bị hồi quy. Gọi `auth()` trong `signIn` hợp lệ, không đệ quy. Còn lại:
+
+| # | Mức | Vấn đề | Đã làm |
+|---|---|---|---|
+| V1 | Vừa | Mã **hết hạn tự nhiên** (30 ngày) bị coi như bị thu hồi. Học viên bị đá ra sau 30 ngày tính từ lúc cấp mã. Lúc deploy, phiên cũ chưa có `loginAt` bị đăng xuất, nên ai có mã đã quá 30 ngày thì không vào lại được. | Chọn (a): chỉ coi là thu hồi khi đã có mã **mới hơn** của cùng học viên. Phiên cũ chưa có `loginAt` bắt đầu tính 30 ngày từ lần đọc đầu tiên sau deploy, không bị đá ra. |
+| L-H1b | Thấp | Kiểm phiên khi liên kết Gmail dùng `auth()`, chưa kiểm mã đã thu hồi và trạng thái tài khoản. | Dùng `getSessionStudentId()`, có kiểm status và mã đã thu hồi. |
+| — | Ghi nhận | Cấp mã mới không gỡ Gmail đã liên kết. | Nếu thu hồi vì mã bị lộ, hãy kiểm thêm Gmail của học viên đó, hoặc khoá tài khoản (`status`). Khoá tài khoản là công tắc tắt mọi phiên của học viên. |
+
 ## Ảnh hưởng khi deploy
-- Mọi học viên đang đăng nhập phải nhập lại mã **một lần**, vì phiên cũ không có `loginAt`. Mã vẫn còn hạn nên vào lại được ngay.
+- Học viên đang đăng nhập **không bị đăng xuất**. Phiên cũ bắt đầu tính hạn tuyệt đối 30 ngày từ lúc deploy (V1).
 - Phiên của chủ sở hữu không bị ảnh hưởng.
 
 ## Chuyển sang UAT (cần tài khoản Google thử)

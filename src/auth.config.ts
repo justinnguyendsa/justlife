@@ -111,10 +111,11 @@ export const authConfig = {
         }
         return token;
       }
-      // Phiên học viên quá hạn tuyệt đối (hoặc phiên cũ chưa có loginAt) → huỷ phiên (H2).
+      // Phiên học viên quá hạn tuyệt đối → huỷ phiên (H2). Phiên tạo trước bản vá chưa có loginAt:
+      // bắt đầu đếm từ lần đọc đầu tiên sau deploy (không đá cả lớp ra cùng lúc; mã cũ có thể đã hết hạn).
       if (token.role === "student") {
-        const loginAt = typeof token.loginAt === "number" ? token.loginAt : 0;
-        if (!loginAt || Date.now() - loginAt > STUDENT_SESSION_MAX_MS) return null;
+        if (typeof token.loginAt !== "number") token.loginAt = Date.now();
+        else if (Date.now() - token.loginAt > STUDENT_SESSION_MAX_MS) return null;
       }
       return token;
     },

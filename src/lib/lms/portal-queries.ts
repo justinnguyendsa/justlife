@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, asc, desc, eq, inArray, gte, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, gt, gte, ne } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import {
   accessCode,
@@ -50,7 +50,8 @@ import { auth } from "@/auth";
  * Đọc studentId từ session Auth.js. Null nếu chưa đăng nhập. NGUỒN DUY NHẤT của studentId.
  * H2 (SPEC-SEC-1.2): phiên JWT không tự thu hồi được, nên ở đây kiểm thêm phía server:
  *  - lms_user còn 'active' (giảng viên khoá học viên → phiên mất hiệu lực ngay);
- *  - nếu phiên đăng nhập bằng mã: mã đó chưa hết hạn / chưa bị thu hồi (cấp mã mới → phiên cũ hết hiệu lực).
+ *  - nếu phiên đăng nhập bằng mã: chưa có mã MỚI HƠN của cùng học viên (cấp mã mới = thu hồi → phiên cũ
+ *    hết hiệu lực). Mã hết hạn tự nhiên KHÔNG đá phiên — hạn tuyệt đối của phiên (jwt, 30 ngày) lo phần đó.
  * Gói `cache()` để một request chỉ truy vấn một lần.
  */
 export const getSessionStudentId = cache(async (): Promise<string | null> => {
@@ -65,11 +66,17 @@ export const getSessionStudentId = cache(async (): Promise<string | null> => {
   if (!me[0] || me[0].status !== "active") return null;
   if (session.accessCodeId) {
     const code = await lmsDb
-      .select({ expiresAt: accessCode.expiresAt })
+      .select({ lmsUserId: accessCode.lmsUserId, createdAt: accessCode.createdAt })
       .from(accessCode)
       .where(eq(accessCode.id, session.accessCodeId))
       .limit(1);
-    if (!code[0] || (code[0].expiresAt != null && code[0].expiresAt < Date.now())) return null;
+    if (!code[0]) return null;
+    const newer = await lmsDb
+      .select({ id: accessCode.id })
+      .from(accessCode)
+      .where(and(eq(accessCode.lmsUserId, code[0].lmsUserId), gt(accessCode.createdAt, code[0].createdAt)))
+      .limit(1);
+    if (newer[0]) return null;
   }
   return studentId;
 });

@@ -111,11 +111,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const intentStudentId = verifyIntent(intent, Date.now(), linkIntentSecret());
         if (!intentStudentId) return "/portal/profile?link=expired";
         if (!email || profile?.email_verified !== true) return "/portal/profile?link=invalid";
-        let current: string | undefined;
+        let current: string | null;
         try {
-          current = (await auth())?.studentId;
+          const { getSessionStudentId } = await import("@/lib/lms/portal-queries");
+          current = await getSessionStudentId(); // kiểm cả status + mã đã thu hồi, không chỉ đọc JWT
         } catch {
-          current = undefined;
+          current = null;
         }
         if (current !== intentStudentId) {
           console.error("[student-gmail-link] REJECT", { reason: "session_mismatch" });
