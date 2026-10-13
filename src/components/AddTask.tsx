@@ -125,14 +125,16 @@ export function AddTask() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          size="icon"
-          aria-label="Thêm việc"
-          className="fixed right-[18px] bottom-[78px] z-25 size-[54px] rounded-[17px] shadow-lg md:bottom-7 [&_svg:not([class*='size-'])]:size-6"
-        >
-          <Plus strokeWidth={2.2} />
-        </Button>
+      <DialogTrigger
+        render={
+          <Button
+            size="icon"
+            aria-label="Thêm việc"
+            className="fixed right-[18px] bottom-[78px] z-25 size-[54px] rounded-[17px] shadow-lg md:bottom-7 [&_svg:not([class*='size-'])]:size-6"
+          />
+        }
+      >
+        <Plus strokeWidth={2.2} />
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-[520px]">

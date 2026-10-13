@@ -45,6 +45,7 @@ import { TasksClient } from "@/app/(app)/tasks/TasksClient";
 import { TaskDetail } from "@/app/(app)/tasks/TaskDetail";
 import { DoneList } from "@/app/(app)/tasks/DoneList";
 import { CalendarPreview } from "./CalendarPreview";
+import { OverlayPreview } from "./OverlayPreview";
 import { FocusClient } from "@/app/(focus)/focus/FocusClient";
 import { SettingsClient } from "@/app/(app)/settings/SettingsClient";
 import type { FixedSchedule } from "@/db/schema";
@@ -337,6 +338,10 @@ export default function UiKitPage() {
           </div>
           <DoneList tasks={[sampleTask({ id: "d1", title: "Gửi biên bản họp KPI", status: "done", doneAt: NOW - 86_400_000 })]} />
         </div>
+      </Block>
+
+      <Block title="Hộp thoại và sheet (Base UI) — bấm được">
+        <OverlayPreview />
       </Block>
 
       <Block title="Lịch — thành phần P2.3 (dữ liệu mẫu, chỉ để xem — đã khoá bấm)">

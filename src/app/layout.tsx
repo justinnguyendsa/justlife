@@ -39,7 +39,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: THEME_SCRIPT,
           }}
         />
-        {children}
+        {/* Ngữ cảnh xếp lớp riêng cho app: popup Base UI (portal vào body) luôn nổi trên nội dung (ADR-005 3c.2). */}
+        <div className="isolate">{children}</div>
       </body>
     </html>
   );
