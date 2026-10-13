@@ -140,6 +140,19 @@ describe("một Gmail một học viên (unique index)", () => {
     expect(await linkVerifiedGoogleEmail("s2", "HV@example.test", "owner@example.test")).toEqual({ ok: false, reason: "taken" });
   });
 
+  it("hai học viên liên kết cùng Gmail song song → đúng một người thành công (ADR-005 §8 3e)", async () => {
+    await lmsDb.insert(lmsUser).values({ id: "u1", studentId: "s1", createdAt: T0 });
+    await lmsDb.insert(lmsUser).values({ id: "u2", studentId: "s2", createdAt: T0 });
+    const rs = await Promise.all([
+      linkVerifiedGoogleEmail("s1", "chung@example.test", "owner@example.test"),
+      linkVerifiedGoogleEmail("s2", "chung@example.test", "owner@example.test"),
+    ]);
+    expect(rs.filter((r) => r.ok).length).toBe(1);
+    expect(rs.find((r) => !r.ok)).toEqual({ ok: false, reason: "taken" });
+    const n = await lmsLibsql.execute("SELECT COUNT(*) AS n FROM lms_user WHERE email_index IS NOT NULL");
+    expect(Number(n.rows[0].n)).toBe(1);
+  });
+
   it("nhiều học viên chưa gắn Gmail (NULL) không vướng ràng buộc", async () => {
     await lmsDb.insert(lmsUser).values({ id: "u1", studentId: "s1", createdAt: T0 });
     await lmsDb.insert(lmsUser).values({ id: "u2", studentId: "s2", createdAt: T0 });
