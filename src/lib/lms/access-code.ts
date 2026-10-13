@@ -1,9 +1,10 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
-import { and, eq, gt, isNull, or } from "drizzle-orm";
-import { lmsDb } from "@/db/lms/client";
+import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { lmsDb, lmsLibsql } from "@/db/lms/client";
 import { accessCode, lmsUser } from "@/db/lms/schema";
 import { genId } from "@/lib/id";
-import { createFailThrottle } from "@/lib/lms/fail-throttle";
+import { linkIntentSecret } from "@/lib/lms/link-intent";
+import { createLoginThrottle } from "@/lib/lms/login-throttle";
 
 // 🔐 Access-code = provider PHỤ (Credentials) dùng NGAY ở P5a (ADR-002 Q3, blocker #6).
 // - Sinh code mạnh bằng crypto.randomInt (KHÔNG Math.random, KHÔNG genId cho phần bí mật).
@@ -31,19 +32,46 @@ const LOCK_MS = 15 * 60_000; // khóa 15 phút
 const DEFAULT_TTL_MS = 30 * 86_400_000; // mã sống 30 ngày (P5a; chốt lại ở go-live)
 const WINDOW_MS = 15 * 60_000; // cửa sổ đếm lần sai
 
-// --- Chặn đoán mã theo NƠI TRUY CẬP (SPEC-SEC-1.2 S02–S03) ---
+// --- Chặn đoán mã theo NƠI TRUY CẬP (SPEC-SEC-1.2 S02–S03, ADR-005 3e) ---
 // Code sai KHÔNG khớp hash bất kỳ row nào → không có bản ghi để gắn đếm theo mã; vì vậy đếm theo
-// khoá = IP người gửi (authorize truyền vào). Trước đây đếm CHUNG: 5 lần sai của bất kỳ ai khoá cả lớp.
-// Bộ đếm nằm trong bộ nhớ từng instance — store bền (bảng/KV) để giai đoạn 3.
+// khoá = IP người gửi (authorize truyền vào). Bộ đếm LƯU BỀN trong bảng auth_throttle (chung mọi
+// instance serverless); bảng chưa có (chưa migrate) → tự dùng bộ đếm trong bộ nhớ như trước.
 // 🗣️ Bình dân: nhập sai liên tục thì chỉ máy đó bị "tạm dừng thử", học viên khác không bị ảnh hưởng.
-const throttle = createFailThrottle({ windowMs: WINDOW_MS, perKeyMax: MAX_ATTEMPTS, globalMax: GLOBAL_MAX_ATTEMPTS });
+let throttle: ReturnType<typeof createLoginThrottle> | null = null;
+const getThrottle = () =>
+  (throttle ??= createLoginThrottle({
+    client: lmsLibsql,
+    windowMs: WINDOW_MS,
+    perKeyMax: MAX_ATTEMPTS,
+    globalMax: GLOBAL_MAX_ATTEMPTS,
+    secret: linkIntentSecret(),
+    onFallback: (e) =>
+      console.warn("[access-code] bảng auth_throttle chưa sẵn sàng — tạm đếm trong bộ nhớ:", String(e).slice(0, 120)),
+  }));
 
-/** Thu hồi MỌI mã còn hạn của học viên (kể cả mã đã từng dùng) — đặt hết hạn về quá khứ. */
-async function revokeActiveCodes(lmsUserId: string, now: number) {
-  await lmsDb
-    .update(accessCode)
-    .set({ expiresAt: now - 1 })
-    .where(and(eq(accessCode.lmsUserId, lmsUserId), or(isNull(accessCode.expiresAt), gt(accessCode.expiresAt, now - 1))));
+/**
+ * Thu hồi MỌI mã còn hạn của học viên (kể cả mã đã từng dùng) rồi lưu mã mới — trong MỘT giao dịch.
+ * createdAt của mã mới luôn LỚN HƠN mọi mã cũ của user (kể cả cấp hai lần trong cùng 1 ms) → phiên
+ * gắn mã cũ chắc chắn bị getSessionStudentId từ chối.
+ */
+async function replaceActiveCode(row: { id: string; lmsUserId: string; codeHash: string; now: number; expiresAt: number }) {
+  const { id, lmsUserId, codeHash, now, expiresAt } = row;
+  await lmsDb.batch([
+    lmsDb
+      .update(accessCode)
+      .set({ expiresAt: now - 1 })
+      .where(and(eq(accessCode.lmsUserId, lmsUserId), or(isNull(accessCode.expiresAt), gt(accessCode.expiresAt, now - 1)))),
+    lmsDb.insert(accessCode).values({
+      id,
+      lmsUserId,
+      codeHash,
+      createdAt: sql`MAX(${now}, COALESCE((SELECT MAX(${accessCode.createdAt}) FROM ${accessCode} WHERE ${accessCode.lmsUserId} = ${lmsUserId}), 0) + 1)`,
+      expiresAt,
+      usedAt: null,
+      attemptCount: 0,
+      lockedUntil: null,
+    }),
+  ]);
 }
 
 /** Chuẩn hóa code người dùng nhập: bỏ khoảng trắng, in hoa, đảm bảo có dấu '-' giữa 2 nhóm. */
@@ -113,22 +141,11 @@ export async function issueAccessCode(
   // Vô hiệu hóa mọi code cũ còn hạn. (Trước đây chỉ đánh dấu usedAt cho code CHƯA dùng, mà verify
   // lại bỏ qua usedAt → code cũ vẫn đăng nhập được tới khi hết hạn.)
   const now = Date.now();
-  await revokeActiveCodes(lmsUserId, now);
-
   const ttl = opts?.ttlMs ?? DEFAULT_TTL_MS;
   const expiresAt = now + ttl;
   const raw = generateRawCode();
   const id = genId();
-  await lmsDb.insert(accessCode).values({
-    id,
-    lmsUserId,
-    codeHash: hashCode(raw),
-    createdAt: now,
-    expiresAt,
-    usedAt: null,
-    attemptCount: 0,
-    lockedUntil: null,
-  });
+  await replaceActiveCode({ id, lmsUserId, codeHash: hashCode(raw), now, expiresAt });
 
   return { code: raw, lmsUserId, accessCodeId: id, expiresAt };
 }
@@ -154,20 +171,9 @@ export async function issueFixedAccessCodeForDev(
   }
   const lmsUserId = await ensureCredentialsUser(studentId);
   const now = Date.now();
-  await revokeActiveCodes(lmsUserId, now);
-
   const expiresAt = now + (opts?.ttlMs ?? DEFAULT_TTL_MS);
   const id = genId();
-  await lmsDb.insert(accessCode).values({
-    id,
-    lmsUserId,
-    codeHash: hashCode(normalized),
-    createdAt: now,
-    expiresAt,
-    usedAt: null,
-    attemptCount: 0,
-    lockedUntil: null,
-  });
+  await replaceActiveCode({ id, lmsUserId, codeHash: hashCode(normalized), now, expiresAt });
   return { code: normalized, lmsUserId, accessCodeId: id, expiresAt };
 }
 
@@ -192,7 +198,8 @@ export interface VerifyResult {
  *  - lookup deterministic theo codeHash (1 query, KHÔNG quét giải mã).
  *  - kiểm expiresAt (hết hạn hoặc đã thu hồi → từ chối), lockedUntil (dữ liệu cũ), lms_user.status.
  *    usedAt chỉ là vết "đã dùng gần nhất" — KHÔNG dùng để thu hồi (thu hồi = đặt expiresAt về quá khứ).
- *  - sai → đếm theo `clientKey` (IP); vượt MAX_ATTEMPTS trong WINDOW_MS → nơi đó bị từ chối tạm.
+ *  - mỗi lượt (đúng định dạng) đếm theo `clientKey` (IP) TRƯỚC khi tra; đúng mã thì trả lại lượt.
+ *    Vượt MAX_ATTEMPTS trong một cửa sổ WINDOW_MS → nơi đó bị từ chối tạm ({ blocked: true }).
  *  - KHÔNG phân biệt "không tồn tại" vs "sai" cho caller (chống enumeration): luôn trả null.
  */
 export async function verifyAccessCode(
@@ -202,8 +209,6 @@ export async function verifyAccessCode(
   const now = Date.now();
   // Khoá đếm = IP người gửi. Chỉ tin được x-forwarded-for khi chạy sau Vercel (Vercel ghi đè header này).
   const key = opts?.clientKey || "unknown";
-  // Nơi truy cập này nhập sai quá nhiều gần đây (hoặc bị dồn dập toàn cục) → báo "thử lại sau".
-  if (throttle.isBlocked(key, now)) return { blocked: true };
 
   const normalized = normalizeCode(rawInput);
   if (normalized.length === 0) return null;
@@ -211,8 +216,10 @@ export async function verifyAccessCode(
   // Dev cho phép mã cố định khác định dạng (issueFixedAccessCodeForDev).
   if (process.env.NODE_ENV === "production" && !CODE_RE.test(normalized)) return null;
 
-  // M1: tính lượt TRƯỚC khi truy vấn (bắn song song không né được bộ đếm); đúng mã thì trả lại.
-  throttle.recordFail(key, now);
+  // M1: tính lượt TRƯỚC khi truy vấn, nguyên tử trong DB (bắn song song, nhiều instance cũng không né
+  // được bộ đếm). Nơi truy cập nhập sai quá nhiều (hoặc bị dồn dập toàn cục) → báo "thử lại sau".
+  const attempt = await getThrottle().attempt(key, now);
+  if (attempt.blocked) return { blocked: true };
 
   const hash = hashCode(normalized);
 
@@ -258,7 +265,7 @@ export async function verifyAccessCode(
   }
 
   // Thành công: trả lại lượt đã tính, reset đếm sai per-code + khóa, cập nhật usedAt (vết "đã dùng gần nhất").
-  throttle.refund(key);
+  await attempt.refund();
   await lmsDb
     .update(accessCode)
     .set({ attemptCount: 0, lockedUntil: null, usedAt: now })

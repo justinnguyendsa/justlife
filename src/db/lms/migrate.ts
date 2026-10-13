@@ -118,7 +118,37 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_post_parent ON tc_post(parent_id)`,
   `CREATE INDEX IF NOT EXISTS idx_enrol_code_course ON class_enrol_code(course_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_enrol_code_code ON class_enrol_code(code)`,
+  // ---- ADR-005 3e: bộ chặn đoán mã lưu bền (chung mọi instance) — khoá = HMAC(IP), không IP thô ----
+  `CREATE TABLE IF NOT EXISTS auth_throttle (key_hash TEXT NOT NULL, window_start INTEGER NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (key_hash, window_start))`,
+  `CREATE INDEX IF NOT EXISTS idx_auth_throttle_window ON auth_throttle(window_start)`,
 ];
+
+// ADR-005 3e (SPEC-SEC-1.2 V1): một Gmail chỉ gắn được MỘT học viên — chặn ở tầng DB bằng unique index.
+// Chỉ tạo khi dữ liệu hiện có KHÔNG trùng; trùng thì bỏ qua + cảnh báo (không in PII), chờ chủ dự án dọn.
+const UNIQUE_EMAIL_INDEX = `CREATE UNIQUE INDEX IF NOT EXISTS ux_lms_user_email_index ON lms_user(email_index) WHERE email_index IS NOT NULL`;
+
+async function ensureUniqueEmailIndex() {
+  const linked = Number(
+    (await lmsLibsql.execute("SELECT COUNT(*) AS n FROM lms_user WHERE email_index IS NOT NULL")).rows[0]?.n ?? 0,
+  );
+  const dupGroups = Number(
+    (
+      await lmsLibsql.execute(
+        "SELECT COUNT(*) AS n FROM (SELECT email_index FROM lms_user WHERE email_index IS NOT NULL GROUP BY email_index HAVING COUNT(*) > 1)",
+      )
+    ).rows[0]?.n ?? 0,
+  );
+  console.log(`Gmail đã liên kết: ${linked} tài khoản học viên (M3 — số đếm, không in địa chỉ).`);
+  if (dupGroups > 0) {
+    console.warn(
+      `⚠ Có ${dupGroups} Gmail đang gắn với nhiều học viên → CHƯA tạo ràng buộc "một Gmail một học viên". ` +
+        `Dọn dữ liệu trùng (cần chủ dự án duyệt) rồi chạy lại migrate.`,
+    );
+    return;
+  }
+  await lmsLibsql.execute(UNIQUE_EMAIL_INDEX);
+  console.log("✓ Ràng buộc một Gmail một học viên: đã bật.");
+}
 
 async function main() {
   // Script KHÔNG tự nạp .env. Chạy trần = sửa FILE LOCAL, không phải Turso. In rõ đích đến
@@ -177,6 +207,7 @@ async function main() {
       throw e;
     }
   }
+  await ensureUniqueEmailIndex();
   console.log(`✓ migrate: tạo bảng xong — ${isRemote ? "Turso (remote)" : "file local"}`);
 }
 

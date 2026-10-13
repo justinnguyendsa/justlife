@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { and, asc, desc, eq, inArray, gt, gte, ne } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
+import { isUniqueViolation } from "@/lib/lms/db-errors";
 import {
   accessCode,
   enrollment,
@@ -607,10 +608,17 @@ export async function linkVerifiedGoogleEmail(
     .limit(1);
   if (existing[0]) return { ok: false, reason: "taken" };
 
-  await lmsDb
-    .update(lmsUser)
-    .set({ email: encryptFieldOpt(normalized), emailIndex: emailIdx })
-    .where(eq(lmsUser.studentId, studentId));
+  try {
+    await lmsDb
+      .update(lmsUser)
+      .set({ email: encryptFieldOpt(normalized), emailIndex: emailIdx })
+      .where(eq(lmsUser.studentId, studentId));
+  } catch (e) {
+    // ADR-005 3e: unique index ux_lms_user_email_index chặn hai học viên giành cùng Gmail cùng lúc
+    // (lọt qua bước kiểm ở trên) → báo "đã có người dùng" thay vì lỗi máy chủ.
+    if (isUniqueViolation(e)) return { ok: false, reason: "taken" };
+    throw e;
+  }
   return { ok: true };
 }
 
