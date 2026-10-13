@@ -127,7 +127,8 @@ const STATEMENTS = [
 // Chỉ tạo khi dữ liệu hiện có KHÔNG trùng; trùng thì bỏ qua + cảnh báo (không in PII), chờ chủ dự án dọn.
 const UNIQUE_EMAIL_INDEX = `CREATE UNIQUE INDEX IF NOT EXISTS ux_lms_user_email_index ON lms_user(email_index) WHERE email_index IS NOT NULL`;
 
-async function ensureUniqueEmailIndex() {
+/** Trả false khi CHƯA bật được ràng buộc (dữ liệu trùng) để main báo to và thoát mã khác 0. */
+async function ensureUniqueEmailIndex(): Promise<boolean> {
   const linked = Number(
     (await lmsLibsql.execute("SELECT COUNT(*) AS n FROM lms_user WHERE email_index IS NOT NULL")).rows[0]?.n ?? 0,
   );
@@ -144,10 +145,11 @@ async function ensureUniqueEmailIndex() {
       `⚠ Có ${dupGroups} Gmail đang gắn với nhiều học viên → CHƯA tạo ràng buộc "một Gmail một học viên". ` +
         `Dọn dữ liệu trùng (cần chủ dự án duyệt) rồi chạy lại migrate.`,
     );
-    return;
+    return false;
   }
   await lmsLibsql.execute(UNIQUE_EMAIL_INDEX);
   console.log("✓ Ràng buộc một Gmail một học viên: đã bật.");
+  return true;
 }
 
 async function main() {
@@ -207,7 +209,15 @@ async function main() {
       throw e;
     }
   }
-  await ensureUniqueEmailIndex();
+  const uniqueOk = await ensureUniqueEmailIndex();
+  if (!uniqueOk) {
+    console.error(
+      `\n⚠ migrate: bảng đã tạo xong — ${isRemote ? "Turso (remote)" : "file local"} — NHƯNG ràng buộc ` +
+        `"một Gmail một học viên" CHƯA bật (xem cảnh báo ở trên). Thoát mã 2.`,
+    );
+    process.exitCode = 2;
+    return;
+  }
   console.log(`✓ migrate: tạo bảng xong — ${isRemote ? "Turso (remote)" : "file local"}`);
 }
 

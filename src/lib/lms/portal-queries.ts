@@ -609,10 +609,11 @@ export async function linkVerifiedGoogleEmail(
   if (existing[0]) return { ok: false, reason: "taken" };
 
   try {
+    // Ghi theo id hàng (student_id không unique — hai hàng trùng sẽ cùng nhận email_index → "taken" giả).
     await lmsDb
       .update(lmsUser)
       .set({ email: encryptFieldOpt(normalized), emailIndex: emailIdx })
-      .where(eq(lmsUser.studentId, studentId));
+      .where(eq(lmsUser.id, me[0].id));
   } catch (e) {
     // ADR-005 3e: unique index ux_lms_user_email_index chặn hai học viên giành cùng Gmail cùng lúc
     // (lọt qua bước kiểm ở trên) → báo "đã có người dùng" thay vì lỗi máy chủ.

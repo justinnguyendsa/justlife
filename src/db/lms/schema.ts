@@ -415,7 +415,8 @@ export type TcPost = typeof tcPost.$inferSelect;
 export type ClassEnrolCode = typeof classEnrolCode.$inferSelect;
 
 // ---- ADR-005 3e: bộ chặn đoán mã lưu bền (src/lib/lms/login-throttle.ts truy vấn bằng SQL thô) ----
-// key_hash = HMAC(IP) — KHÔNG lưu IP thô; dữ liệu chỉ sống ≤ 2 cửa sổ 15 phút rồi bị dọn.
+// key_hash = HMAC(khoá con từ AUTH_SECRET, IP hoặc dải IPv6 /64) — KHÔNG lưu IP thô. Hàng cũ hơn 2 cửa sổ
+// 15 phút bị dọn ở lượt thử đăng nhập kế tiếp (lâu không ai đăng nhập thì nằm lại: chỉ là khoá băm + số đếm).
 export const authThrottle = sqliteTable(
   "auth_throttle",
   {

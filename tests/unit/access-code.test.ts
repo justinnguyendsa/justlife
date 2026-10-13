@@ -7,12 +7,19 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 vi.hoisted(() => {
   process.env.LMS_DATABASE_URL = ":memory:";
   delete process.env.LMS_DATABASE_AUTH_TOKEN;
+  process.env.AUTH_SECRET = "test-secret-3e";
+  process.env.LMS_INDEX_KEY = "11".repeat(32);
+  process.env.LMS_ENCRYPTION_KEY = "22".repeat(32);
 });
+vi.mock("@/auth", () => ({ auth: vi.fn(async () => null) }));
 
+import { eq } from "drizzle-orm";
 import { lmsDb, lmsLibsql } from "@/db/lms/client";
 import { lmsUser } from "@/db/lms/schema";
 import { ACCESS_CODE_POLICY, issueAccessCode, verifyAccessCode } from "@/lib/lms/access-code";
 import { isUniqueViolation } from "@/lib/lms/db-errors";
+import { hashThrottleKey } from "@/lib/lms/login-throttle";
+import { linkVerifiedGoogleEmail } from "@/lib/lms/portal-queries";
 
 const DDL = `
 CREATE TABLE lms_user (
@@ -66,11 +73,23 @@ describe("verifyAccessCode — bộ chặn lưu bền", () => {
     expect(rs.filter((r) => r === null).length).toBe(ACCESS_CODE_POLICY.MAX_ATTEMPTS);
   });
 
-  it("không lưu IP thô", async () => {
+  it("không lưu IP thô — khoá là HMAC từ AUTH_SECRET", async () => {
     await verifyAccessCode(WRONG, { clientKey: "203.0.113.9" });
-    const rows = await lmsLibsql.execute("SELECT key_hash FROM auth_throttle");
-    expect(rows.rows.length).toBeGreaterThan(0);
-    expect(rows.rows.some((r) => String(r.key_hash).includes("203.0.113"))).toBe(false);
+    const keys = (await lmsLibsql.execute("SELECT key_hash FROM auth_throttle")).rows.map((r) => String(r.key_hash));
+    expect(keys.some((k) => k.includes("203.0.113"))).toBe(false);
+    expect(keys).toContain(hashThrottleKey("203.0.113.9", "test-secret-3e"));
+  });
+
+  it("bị dồn dập vượt trần chung: học viên mới gõ đúng vẫn vào, nơi đã sai nhiều bị chặn (audit M1)", async () => {
+    const { code } = await issueAccessCode("s1");
+    const { MAX_ATTEMPTS, GLOBAL_MAX_ATTEMPTS, FLOOD_MAX_ATTEMPTS } = ACCESS_CODE_POLICY;
+    for (let ip = 0; ip < GLOBAL_MAX_ATTEMPTS / MAX_ATTEMPTS; ip++) {
+      for (let i = 0; i < MAX_ATTEMPTS; i++) await verifyAccessCode(WRONG, { clientKey: `198.51.100.${ip}` });
+    }
+    const ok = await verifyAccessCode(code, { clientKey: "192.0.2.50" });
+    expect(ok && "studentId" in ok ? ok.studentId : ok).toBe("s1");
+    for (let i = 0; i < FLOOD_MAX_ATTEMPTS; i++) expect(await verifyAccessCode(WRONG, { clientKey: "192.0.2.60" })).toBeNull();
+    expect(await verifyAccessCode(code, { clientKey: "192.0.2.60" })).toEqual({ blocked: true });
   });
 });
 
@@ -98,11 +117,27 @@ describe("một Gmail một học viên (unique index)", () => {
     const err = await lmsDb
       .update(lmsUser)
       .set({ emailIndex: "idx-a" })
-      .where((await import("drizzle-orm")).eq(lmsUser.id, "u2"))
+      .where(eq(lmsUser.id, "u2"))
       .then(() => null, (e: unknown) => e);
     expect(err).not.toBeNull();
     expect(isUniqueViolation(err)).toBe(true);
     expect(isUniqueViolation(new Error("khác"))).toBe(false);
+    // Dạng lỗi qua Turso HTTP: mã chung SQLITE_CONSTRAINT, chỉ thông báo nói rõ UNIQUE.
+    const remote = { code: "SQLITE_CONSTRAINT", message: "SQLITE_CONSTRAINT: UNIQUE constraint failed: lms_user.email_index" };
+    expect(isUniqueViolation(new Error("Failed query", { cause: remote }))).toBe(true);
+    expect(isUniqueViolation({ code: "SQLITE_CONSTRAINT", message: "NOT NULL constraint failed: lms_user.id" })).toBe(false);
+  });
+
+  it("liên kết Gmail: học viên lỡ có 2 hàng lms_user vẫn liên kết được; người khác giành → taken (audit L6)", async () => {
+    await lmsDb.insert(lmsUser).values({ id: "u1a", studentId: "s1", createdAt: T0 });
+    await lmsDb.insert(lmsUser).values({ id: "u1b", studentId: "s1", createdAt: T0 });
+    await lmsDb.insert(lmsUser).values({ id: "u2", studentId: "s2", createdAt: T0 });
+    expect(await linkVerifiedGoogleEmail("s1", "hv@example.test", "owner@example.test")).toEqual({ ok: true });
+    const linked = await lmsDb.select({ id: lmsUser.id }).from(lmsUser).where(eq(lmsUser.studentId, "s1"));
+    const withEmail = (await lmsLibsql.execute("SELECT id FROM lms_user WHERE email_index IS NOT NULL")).rows;
+    expect(linked.length).toBe(2);
+    expect(withEmail.length).toBe(1);
+    expect(await linkVerifiedGoogleEmail("s2", "HV@example.test", "owner@example.test")).toEqual({ ok: false, reason: "taken" });
   });
 
   it("nhiều học viên chưa gắn Gmail (NULL) không vướng ràng buộc", async () => {

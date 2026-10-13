@@ -28,6 +28,7 @@ const CODE_RE = new RegExp(`^[${ALPHABET}]{${GROUP_LEN}}-[${ALPHABET}]{${GROUP_L
 
 const MAX_ATTEMPTS = 20; // sai quá ngưỡng (mỗi nơi truy cập) → khóa tạm nơi đó (cả lớp có thể chung 1 IP)
 const GLOBAL_MAX_ATTEMPTS = 300; // ngưỡng chung rất cao — chặn tấn công dồn dập từ nhiều nơi
+const FLOOD_MAX_ATTEMPTS = 3; // khi vượt ngưỡng chung: nơi đã thử > 3 lượt mới bị chặn (không khoá cả hệ thống)
 const LOCK_MS = 15 * 60_000; // khóa 15 phút
 const DEFAULT_TTL_MS = 30 * 86_400_000; // mã sống 30 ngày (P5a; chốt lại ở go-live)
 const WINDOW_MS = 15 * 60_000; // cửa sổ đếm lần sai
@@ -44,6 +45,7 @@ const getThrottle = () =>
     windowMs: WINDOW_MS,
     perKeyMax: MAX_ATTEMPTS,
     globalMax: GLOBAL_MAX_ATTEMPTS,
+    floodKeyMax: FLOOD_MAX_ATTEMPTS,
     secret: linkIntentSecret(),
     onFallback: (e) =>
       console.warn("[access-code] bảng auth_throttle chưa sẵn sàng — tạm đếm trong bộ nhớ:", String(e).slice(0, 120)),
@@ -265,11 +267,16 @@ export async function verifyAccessCode(
   }
 
   // Thành công: trả lại lượt đã tính, reset đếm sai per-code + khóa, cập nhật usedAt (vết "đã dùng gần nhất").
+  // Ghi vết là phụ: DB tạm không ghi được (vd hết hạn mức) thì vẫn cho đăng nhập (audit 3e M2).
   await attempt.refund();
-  await lmsDb
-    .update(accessCode)
-    .set({ attemptCount: 0, lockedUntil: null, usedAt: now })
-    .where(eq(accessCode.id, row.id));
+  try {
+    await lmsDb
+      .update(accessCode)
+      .set({ attemptCount: 0, lockedUntil: null, usedAt: now })
+      .where(eq(accessCode.id, row.id));
+  } catch (e) {
+    console.warn("[access-code] không ghi được usedAt:", String(e).slice(0, 120));
+  }
 
   return {
     studentId: user.studentId,
@@ -279,4 +286,11 @@ export async function verifyAccessCode(
   };
 }
 
-export const ACCESS_CODE_POLICY = { MAX_ATTEMPTS, LOCK_MS, DEFAULT_TTL_MS, WINDOW_MS } as const;
+export const ACCESS_CODE_POLICY = {
+  MAX_ATTEMPTS,
+  GLOBAL_MAX_ATTEMPTS,
+  FLOOD_MAX_ATTEMPTS,
+  LOCK_MS,
+  DEFAULT_TTL_MS,
+  WINDOW_MS,
+} as const;
