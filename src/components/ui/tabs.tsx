@@ -12,10 +12,12 @@ function Tabs({ className, ...props }: WithClassName<TabsPrimitive.Root.Props>) 
   return <TabsPrimitive.Root data-slot="tabs" className={cn("flex flex-col gap-2", className)} {...props} />;
 }
 
-function TabsList({ className, ...props }: WithClassName<TabsPrimitive.List.Props>) {
+// activateOnFocus mặc định true: phím mũi tên đổi tab ngay, giữ hành vi cũ của Radix (QC 3c.3 L2).
+function TabsList({ className, activateOnFocus = true, ...props }: WithClassName<TabsPrimitive.List.Props>) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
+      activateOnFocus={activateOnFocus}
       className={cn(
         "bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]",
         className

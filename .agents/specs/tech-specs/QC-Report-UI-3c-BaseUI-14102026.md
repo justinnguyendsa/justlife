@@ -57,3 +57,24 @@
 5. Việc trên điện thoại: mở sheet chi tiết, gõ vào ô tên rồi Esc hoặc chạm nền → nội dung tự lưu.
 6. iPhone iOS 26: lớp phủ phủ kín cả vùng dưới thanh trình duyệt.
 7. Chế độ sáng và tối: màu lớp phủ đúng.
+
+## 3c.3 — 6 primitive sang Base UI, gỡ Radix (PR #18)
+
+**Verdict: ✅ PASS.** Không có lỗi chặn; có 4 góp ý mức Thấp. QC (qa-verifier) chạy lại tsc (0 lỗi) và eslint (không thêm lỗi).
+
+| Chiều | Kết quả | Chi tiết |
+|---|---|---|
+| Typecheck / Lint | ✅ | Còn 3 lỗi `react-refresh/only-export-components`, đều có sẵn từ trước. |
+| Schema / API | ✅ | Select, Tabs, Checkbox, Switch, Progress, Separator dùng đúng API của Base UI 1.8.0. Các data-attribute và biến `--anchor-width`, `--available-height`, `--transform-origin` khớp `*DataAttributes.d.ts`. |
+| Radix sạch | ✅ | Không còn import `@radix-ui`, `asChild`, `data-state` trong src/tests/config. `package.json` và lock không còn gói Radix nào. Không còn chỗ nào import 4 primitive đã xoá. |
+| Design token | ✅ | Toàn token, không màu viết cứng mới. |
+| Reuse | ✅ | `shared.ts`. dialog/sheet không đổi hành vi. |
+| Hồi quy màn chính | ✅ | Chỉ `/ui-kit` dùng 6 primitive này. |
+
+| # | Mức | Vấn đề | Đã làm |
+|---|---|---|---|
+| L1 | Thấp | Progress bỏ trống `value` thì thành "không xác định": thanh đầy và aria bằng tiếng Anh. | `value ?? 0` (giữ hành vi cũ). |
+| L2 | Thấp | Tabs của Base UI mặc định không đổi tab khi di chuyển bằng mũi tên. | `TabsList` để `activateOnFocus` mặc định `true`. |
+| L3 | Thấp | Nhãn Select nằm ở cả `items` lẫn `SelectItem`. | Ghi nhận; sẽ sinh cả hai từ một mảng khi có màn thật dùng Select. |
+| L4 | Ghi nhận | `components.json` vẫn là `new-york`; ADR ghi "14 gói", thực tế gỡ 13. | Giữ nguyên (ADR cho phép). Sửa con số khi cập nhật ADR. |
+
