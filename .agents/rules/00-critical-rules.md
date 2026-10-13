@@ -2,7 +2,7 @@
 name: critical-rules
 description: The invariant rules (R-JL-*) every justlife agent must obey. Referenced by agent self-evaluation and the QC/conformance gates.
 type: rules
-updated: 2026-06-20
+updated: 2026-10-14
 ---
 
 # 🛑 justlife — Critical Rules (R-JL-*)
@@ -13,7 +13,7 @@ updated: 2026-06-20
 | ID | Rule |
 |---|---|
 | **R-JL-SHIP-SMALL-01** | Ship MVP nhỏ, dùng được ngay. Chia phase; không gom "big bang". (P1) |
-| **R-JL-NO-BLOAT-01** | Mỗi feature phải phục vụ 1 trong 4 trụ (capture/time-block/habit/rest). Ngoài 4 trụ → parking lot, không build. (P2) |
+| **R-JL-NO-BLOAT-01** *(amended 2026-10-14 — chờ chủ dự án duyệt)* | Mỗi feature phải phục vụ 1 trong 4 trụ (capture/time-block/habit/rest). Trụ habit = **Habit & Self-Improvement — khu "Cuộc sống"** (6 lĩnh vực: Sức khỏe, Tài chính, Công việc, Học tập, Hằng ngày, Nghỉ ngơi). Tài chính chỉ trong phạm vi F4 của `product-vision.md` (nhập tay, chỉ theo dõi, không tư vấn đầu tư, không kết nối ngân hàng). Ngoài 4 trụ → parking lot, không build. (P2) |
 | **R-JL-LESS-MENTAL-LOAD-01** | Tính năng phải giảm tải tâm trí, không bắt người dùng bảo trì thêm. (P3) |
 | **R-JL-RESPECT-SCHEDULE-01** | Gợi ý time-block phải né khối cố định (làm 8h30–18h, mentor 19h15–22h15, học T7/CN). (P4) |
 | **R-JL-SINGLE-USER-01** *(amended 2026-06-21)* | **Personal core là single-user** — KHÔNG over-engineer multi-tenant/RBAC/team cho phần cá nhân. **LMS-lite (dạy học) là subsystem MULTI-USER tách biệt**, đã được chủ dự án yêu cầu → hợp lệ, chỉ bật ở Phase 5, tách credential/DB/route, qua privacy-auditor. (P6) |
@@ -22,7 +22,7 @@ updated: 2026-06-20
 ## Quyền riêng tư & dữ liệu
 | ID | Rule |
 |---|---|
-| **R-JL-PRIVACY-01** | Dữ liệu cá nhân nhạy cảm (sức khỏe/lịch/cảm xúc): tối thiểu hóa thu thập, không gửi ra dịch vụ ngoài khi không cần, không log PII. (P5) |
+| **R-JL-PRIVACY-01** | Dữ liệu cá nhân nhạy cảm (sức khỏe/lịch/cảm xúc/**tài chính**): tối thiểu hóa thu thập, không gửi ra dịch vụ ngoài khi không cần, không log PII. Tài chính: không lưu số tài khoản/số thẻ/mật khẩu/OTP, không log số tiền kèm định danh. (P5) |
 | **R-JL-LOCAL-FIRST-01** | Ưu tiên lưu cục bộ/self-host cho dữ liệu cá nhân. Tích hợp bên thứ ba phải được chủ dự án duyệt rõ ràng. |
 | **R-JL-STUDENT-PII-01** | Dữ liệu học viên là PII, **có thể là trẻ vị thành niên** → nghĩa vụ pháp lý: thu tối thiểu (tên/email/điểm), consent log (+ guardian nếu minor), mã hóa at-rest, audit log truy cập, quyền xóa (cascade) + data-retention. `privacy-auditor` là GATE bắt buộc cho mọi feature LMS. |
 
