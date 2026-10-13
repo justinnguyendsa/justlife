@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -140,6 +141,7 @@ export function AddTask() {
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Thêm việc nhanh</DialogTitle>
+          <DialogDescription className="sr-only">Nhập tên việc, chọn mảng, công sức, tác động và hạn. Việc mới vào Hộp việc.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
