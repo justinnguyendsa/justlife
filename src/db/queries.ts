@@ -27,7 +27,7 @@ export async function getTodayData(now = Date.now()) {
   const doing = await db.select().from(task).where(eq(task.status, "doing")).orderBy(desc(task.priorityScore));
   const top = await db.select().from(task)
     .where(and(ne(task.status, "done"), ne(task.status, "doing"), isNotNull(task.priorityScore)))
-    .orderBy(desc(task.priorityScore)).limit(3);
+    .orderBy(desc(task.priorityScore)).limit(4); // 4 = 1 lên thẻ gợi ý + 3 hàng ưu tiên (Hôm nay)
   const day0 = startOfDay(now);
   const blocks = await db.select().from(timeBlock)
     .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt));
@@ -42,6 +42,11 @@ export async function getCalendarData(dayMs = Date.now()) {
     .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY))).orderBy(asc(timeBlock.startAt));
   const tasks = await db.select().from(task).where(ne(task.status, "done")).orderBy(desc(task.priorityScore));
   return { day0, fixed, blocks, tasks };
+}
+
+// Việc đã xong gần nhất (tab "Đã xong" của Việc — SPEC-UI-P2.2 B02).
+export async function listDoneTasks(limit = 50) {
+  return db.select().from(task).where(eq(task.status, "done")).orderBy(desc(task.doneAt)).limit(limit);
 }
 
 export async function getDeadlinesData(now = Date.now()) {

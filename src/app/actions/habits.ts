@@ -8,7 +8,7 @@ import { hbHabit, hbLog, restBlock } from "@/db/schema";
 import { genId } from "@/lib/id";
 import { dateKey } from "@/lib/format";
 
-function refresh() { revalidatePath("/habits"); revalidatePath("/develop"); }
+function refresh() { revalidatePath("/habits"); revalidatePath("/develop"); revalidatePath("/today"); }
 
 export async function createHabit(input: { name: string }) {
   await requireOwner();
@@ -76,7 +76,7 @@ export async function addRest(input: { minutes: number; note?: string }) {
   await requireOwner();
 
   await db.insert(restBlock).values({ id: genId(), dateKey: dateKey(), minutes: input.minutes, note: input.note ?? null, createdAt: Date.now() });
-  revalidatePath("/rest"); revalidatePath("/develop");
+  revalidatePath("/rest"); revalidatePath("/develop"); revalidatePath("/today");
   return { ok: true };
 }
 export { addRest as addRestBlock };
@@ -85,7 +85,7 @@ export async function deleteRest(id: string) {
   await requireOwner();
 
   await db.delete(restBlock).where(eq(restBlock.id, id));
-  revalidatePath("/rest"); revalidatePath("/develop");
+  revalidatePath("/rest"); revalidatePath("/develop"); revalidatePath("/today");
   return { ok: true };
 }
 export { deleteRest as deleteRestBlock };

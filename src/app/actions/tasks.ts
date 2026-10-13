@@ -9,6 +9,8 @@ import { calcPriorityScore } from "@/lib/priority";
 import { buildDeadlineRows } from "@/lib/escalation";
 import { genId } from "@/lib/id";
 
+const TASK_AREAS = ["work", "teach", "study", "growth"];
+
 function refresh() {
   for (const p of ["/today", "/tasks", "/calendar", "/deadlines"]) revalidatePath(p);
 }
@@ -94,6 +96,7 @@ export async function updateTask(
     title?: string;
     note?: string;
     status?: string;
+    area?: string;
     effort?: number | null;
     impact?: number | null;
     deadlineAt?: number | null;
@@ -102,6 +105,11 @@ export async function updateTask(
   await requireOwner();
 
   const now = Date.now();
+
+  // Mảng chỉ nhận 4 giá trị cố định (SPEC-UI-P2.2 B01).
+  if (data.area !== undefined && !TASK_AREAS.includes(data.area)) {
+    return { ok: false, error: "Mảng không hợp lệ" };
+  }
 
   // Validate title nếu được truyền vào
   if (data.title !== undefined) {
@@ -141,6 +149,7 @@ export async function updateTask(
   if (data.title !== undefined) updateValues.title = data.title;
   if (data.note !== undefined) updateValues.note = data.note;
   if (data.status !== undefined) updateValues.status = data.status;
+  if (data.area !== undefined) updateValues.area = data.area;
   if (data.effort !== undefined) updateValues.effort = data.effort;
   if (data.impact !== undefined) updateValues.impact = data.impact;
   if (data.deadlineAt !== undefined) updateValues.deadlineAt = data.deadlineAt;

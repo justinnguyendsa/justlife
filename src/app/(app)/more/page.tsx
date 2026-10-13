@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 // Dạy học và Tài liệu tạm ở đây cho tới khi chuyển sang justudy (F1).
 const ITEMS = [
   { href: "/teaching/classes", label: "Mở justudy", desc: "Dạy học: lớp, điểm danh, chấm bài", Icon: GraduationCap },
-  { href: "/deadlines", label: "Hạn", desc: "Việc và bài học sắp đến hạn", Icon: AlarmClock },
+  { href: "/tasks?tab=han", label: "Hạn", desc: "Việc và bài học sắp đến hạn", Icon: AlarmClock },
   { href: "/library", label: "Tài liệu", desc: "Thư viện file và link chia sẻ", Icon: FolderOpen },
   { href: "/settings", label: "Cài đặt", desc: "Giờ bận, giới hạn, giao diện, tài khoản", Icon: SlidersHorizontal },
 ];
