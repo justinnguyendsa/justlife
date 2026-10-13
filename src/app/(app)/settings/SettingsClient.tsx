@@ -71,7 +71,7 @@ export function SettingsClient({ fixed, wip, account }: { fixed: FixedSchedule[]
         <section aria-labelledby="set-wip" className="bg-card flex flex-col gap-3 rounded-lg border p-5">
           <h2 id="set-wip" className="text-[17px] leading-6 font-semibold">Giới hạn đang làm</h2>
           <p className="text-muted-foreground text-[13px]">Khi đã đủ số việc đang làm, app nhắc bạn tạm dừng một việc trước khi bắt đầu việc mới.</p>
-          <Segmented options={wipOptions} value={w} onChange={saveWip} ariaLabel="Số việc đang làm cùng lúc" />
+          <Segmented options={wipOptions} value={w} onChange={saveWip} ariaLabel="Số việc đang làm cùng lúc" className="flex [&>button]:flex-auto [&>button]:px-3 [&>button]:whitespace-nowrap" />
         </section>
 
         <section aria-labelledby="set-theme" className="bg-card flex flex-col gap-3 rounded-lg border p-5">

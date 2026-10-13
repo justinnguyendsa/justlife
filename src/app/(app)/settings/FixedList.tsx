@@ -13,11 +13,11 @@ export function FixedList({ fixed, onEdit }: { fixed: FixedSchedule[]; onEdit: (
     return <p className="text-muted-foreground border-t pt-3 text-[13px]">Chưa có giờ bận nào. Thêm giờ làm, giờ dạy, giờ học để Lịch tự né.</p>;
   }
   return (
-    <ul className="flex flex-col">
+    <ul className="@container flex flex-col">
       {fixed.map((f) => (
         <li key={f.id} className="flex items-center gap-3 border-t py-2.5">
           <span className={cn("w-1 self-stretch rounded-full", areaBarClass(f.area))} aria-hidden="true" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5 md:flex-row md:items-center md:gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 @[560px]:flex-row @[560px]:items-center @[560px]:gap-3">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-[15px] font-semibold">{f.label}</span>
               <span className="text-muted-foreground font-mono text-[13px]">{minToHHMM(f.startMin)} – {minToHHMM(f.endMin)}</span>
