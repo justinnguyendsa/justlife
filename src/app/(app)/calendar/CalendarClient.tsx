@@ -4,22 +4,15 @@ import { useRouter } from "next/navigation";
 import { Plus, ChevronLeft, ChevronRight, CalendarDays, LayoutGrid } from "lucide-react";
 import type { FixedSchedule, TimeBlock, Task } from "@/db/schema";
 import { createTimeBlock } from "@/app/actions/schedule";
-import type { Conflict } from "@/lib/scheduler";
+import { startOfDay, startOfWeek, type Conflict } from "@/lib/scheduler";
 import { fmtTime, fmtDate } from "@/lib/format";
 import { AREAS } from "@/lib/areas";
 import { toast } from "@/components/Toaster";
 import { CalendarDragDrop } from "@/components/CalendarDragDrop";
 import { CalendarWeekView, getWeekDays } from "@/components/CalendarWeekView";
 
-// ─── Helper: lấy thứ Hai đầu tuần chứa `ms` (local time) ───────────────────
-export function getMonday(ms: number): number {
-  const d = new Date(ms);
-  const day = d.getDay(); // 0=CN
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
+// Thứ Hai đầu tuần chứa `ms`, theo giờ Việt Nam (khớp với server).
+export const getMonday = startOfWeek;
 
 const DAY_MS = 86_400_000;
 const START_HOUR = 7;
@@ -73,7 +66,7 @@ export function CalendarClient({
     router.push(`/calendar?day=${next}`);
   }
   function todayDay() {
-    const t0 = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+    const t0 = startOfDay(Date.now());
     setDay0(t0);
     router.push(`/calendar?day=${t0}`);
   }

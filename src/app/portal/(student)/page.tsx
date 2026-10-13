@@ -11,6 +11,7 @@ import {
   getMyStats28d,
 } from "@/lib/lms/portal-queries";
 import { fmtDate, fmtTime, countdown } from "@/lib/format";
+import { startOfWeek } from "@/lib/scheduler";
 
 export const dynamic = "force-dynamic";
 
@@ -59,12 +60,10 @@ export default async function PortalHomePage() {
   // ST-2: Streak 7 ngày — T2 → CN tuần hiện tại
   const todayKey = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
   const activitySet = new Set(activityDates);
+  // Tuần tính theo giờ Việt Nam (server chạy UTC): thứ Hai 00:00 VN + i ngày.
+  const monday = startOfWeek(now);
   const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    const day = d.getDay(); // 0=CN
-    const diffToMon = day === 0 ? -6 : 1 - day;
-    d.setDate(d.getDate() + diffToMon + i);
-    const key = d.toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
+    const key = new Date(monday + i * 86_400_000 + 12 * 3_600_000).toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
     return {
       key,
       label: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"][i],

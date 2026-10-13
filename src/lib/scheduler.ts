@@ -1,8 +1,25 @@
 import type { FixedSchedule, TimeBlock } from "@/db/schema";
 
+// Giờ Việt Nam: cố định UTC+7, không có giờ mùa hè. Server (Vercel) chạy giờ UTC, nên mọi phép tính
+// "đầu ngày", "thứ mấy", "đầu tuần" phải theo giờ Việt Nam chứ không theo giờ của máy đang chạy.
+// Trước đây dùng setHours/getDay (giờ máy) → trên server, đầu ngày lệch 7 tiếng và lịch cố định
+// có thể rơi sang thứ khác.
+export const VN_OFFSET_MS = 7 * 3_600_000;
+const DAY_MS = 86_400_000;
+
+/** Thứ trong tuần theo giờ Việt Nam: 0=CN … 6=T7 (cùng quy ước Date.getDay()). */
+export function vnWeekday(ms: number): number {
+  return new Date(ms + VN_OFFSET_MS).getUTCDay();
+}
+
+/** Ngày trong tháng (1–31) theo giờ Việt Nam. */
+export function vnDayOfMonth(ms: number): number {
+  return new Date(ms + VN_OFFSET_MS).getUTCDate();
+}
+
 // weekdayMask: bit0=T2(Mon) ... bit6=CN(Sun). JS getDay(): 0=CN..6=T7.
 export function weekdayBit(date: Date): number {
-  const js = date.getDay(); // 0..6 (CN..T7)
+  const js = vnWeekday(date.getTime()); // 0..6 (CN..T7), theo giờ Việt Nam
   const idx = js === 0 ? 6 : js - 1; // → 0..6 (T2..CN)
   return 1 << idx;
 }
@@ -15,11 +32,20 @@ export function rangesOverlap(s1: number, e1: number, s2: number, e2: number): b
   return s1 < e2 && e1 > s2;
 }
 
-// Đầu ngày (local) cho 1 mốc thời gian.
+// 00:00 giờ Việt Nam của ngày chứa mốc `ms` (epoch ms).
 export function startOfDay(ms: number): number {
-  const d = new Date(ms);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  return Math.floor((ms + VN_OFFSET_MS) / DAY_MS) * DAY_MS - VN_OFFSET_MS;
+}
+
+// 00:00 thứ Hai (giờ Việt Nam) của tuần chứa mốc `ms`.
+export function startOfWeek(ms: number): number {
+  const d0 = startOfDay(ms);
+  return d0 - ((vnWeekday(d0) + 6) % 7) * DAY_MS;
+}
+
+// "YYYY-MM-DD" → 00:00 giờ Việt Nam của ngày đó; NaN nếu sai định dạng.
+export function parseVnDate(dateStr: string): number {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? Date.parse(`${dateStr}T00:00:00+07:00`) : NaN;
 }
 
 // Quy đổi 1 fixed_schedule (phút trong ngày) → khoảng epoch ms cho 1 ngày cụ thể.
