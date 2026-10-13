@@ -71,6 +71,11 @@ export function CalendarClient({
   // ─── Điều hướng (ngày ↔ tuần) ─────────────────────────────────────────────
   const goDay = (d: number) => { setDay0(d); setViewMode("day"); setSelectedId(null); router.push(`/calendar?day=${d}`); };
   const goWeek = (ws: number) => { setWeekStart(ws); setViewMode("week"); setSelectedId(null); router.push(`/calendar?weekStart=${ws}`); };
+  // Từ Tuần sang Ngày: hôm nay nếu thuộc tuần đang xem, không thì thứ Hai của tuần đó.
+  const dayInWeek = () => {
+    const t0 = startOfDay(Date.now());
+    return t0 >= weekStart && t0 < weekStart + 7 * DAY_MS ? t0 : weekStart;
+  };
   const prev = () => (viewMode === "day" ? goDay(day0 - DAY_MS) : goWeek(weekStart - 7 * DAY_MS));
   const next = () => (viewMode === "day" ? goDay(day0 + DAY_MS) : goWeek(weekStart + 7 * DAY_MS));
   const today = () => (viewMode === "day" ? goDay(startOfDay(Date.now())) : goWeek(getMonday(Date.now())));
@@ -147,7 +152,7 @@ export function CalendarClient({
         <Segmented
           options={[{ value: "day", label: "Ngày" }, { value: "week", label: "Tuần" }]}
           value={viewMode}
-          onChange={(v) => (v === "day" ? goDay(day0) : goWeek(getMonday(day0)))}
+          onChange={(v) => (v === "day" ? goDay(viewMode === "week" ? dayInWeek() : day0) : goWeek(getMonday(day0)))}
           ariaLabel="Kiểu xem"
         />
       </div>
@@ -162,7 +167,7 @@ export function CalendarClient({
 
   const editor = selected ? (
     <BlockEditor
-      key={selected.id}
+      key={`${selected.id}-${selected.startAt}-${selected.endAt}`}
       block={selected}
       task={selectedTask}
       fixed={fixed}
@@ -181,7 +186,7 @@ export function CalendarClient({
         <Segmented
           options={[{ value: "day", label: "Ngày" }, { value: "week", label: "Tuần" }]}
           value={viewMode}
-          onChange={(v) => (v === "day" ? goDay(day0) : goWeek(getMonday(day0)))}
+          onChange={(v) => (v === "day" ? goDay(viewMode === "week" ? dayInWeek() : day0) : goWeek(getMonday(day0)))}
           ariaLabel="Kiểu xem"
         />
       </div>

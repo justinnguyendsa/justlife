@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FixedSchedule, TimeBlock } from "@/db/schema";
 import { updateTimeBlock } from "@/app/actions/schedule";
 import { maskHasDate, fixedToRange, detectConflicts, startOfDay, type Conflict } from "@/lib/scheduler";
@@ -93,6 +93,20 @@ export function CalendarDragDrop({
     pendingDrag.current = null;
   }
 
+  // Huỷ mọi trạng thái kéo (pointercancel, mất capture, unmount) — khối không bị kẹt ở "đang kéo".
+  function resetDrag() {
+    clearLongPress();
+    drag.current = null;
+    longPressActive.current = false;
+    tapCandidate.current = false;
+    setDragId(null);
+    setDragConflict(false);
+  }
+
+  useEffect(() => () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
+
   function onBlockPointerDown(e: React.PointerEvent, b: TimeBlock) {
     if (e.button !== 0) return;
     if (e.pointerType === "mouse") {
@@ -100,6 +114,7 @@ export function CalendarDragDrop({
       activateDrag(b, e.clientY, e.currentTarget as HTMLElement, e.pointerId);
       return;
     }
+    clearLongPress(); // chạm đa điểm: bỏ timer cũ trước khi đặt timer mới
     longPressActive.current = false;
     tapCandidate.current = true;
     pendingDrag.current = { b, pointerId: e.pointerId, clientY: e.clientY, el: e.currentTarget as HTMLElement };
@@ -228,7 +243,9 @@ export function CalendarDragDrop({
                 onPointerDown={(e) => onBlockPointerDown(e, b)}
                 onPointerMove={onBlockPointerMove}
                 onPointerUp={(e) => onBlockPointerUp(e, b)}
-                onPointerCancel={() => { tapCandidate.current = false; clearLongPress(); }}
+                onPointerCancel={resetDrag}
+                onLostPointerCapture={() => { if (drag.current?.id === b.id) resetDrag(); }}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 {b.title}
                 {height >= 34 && <span className="block font-mono text-[11px] font-medium opacity-90">{fmtTime(liveStart)}–{fmtTime(liveEnd)}</span>}
