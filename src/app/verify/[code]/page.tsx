@@ -1,6 +1,7 @@
 import { lmsDb } from "@/db/lms/client";
 import { tcCertificate, tcCourse, lmsPerson } from "@/db/lms/schema";
 import { eq } from "drizzle-orm";
+import { decryptFieldOpt } from "@/lib/lms/crypto";
 
 // /verify/[code] — trang tra cứu chứng chỉ CÔNG KHAI.
 // CHỈ hiển: tên khóa + ngày + hợp lệ. KHÔNG lộ PII thừa (ADR-003 QĐ1.5).
@@ -9,7 +10,6 @@ function safeDecrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   if (typeof value === "string" && value.startsWith("v1:")) {
     try {
-      const { decryptFieldOpt } = require("@/lib/lms/crypto");
       return decryptFieldOpt(value);
     } catch { return value; }
   }

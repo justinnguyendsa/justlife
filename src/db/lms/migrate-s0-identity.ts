@@ -1,13 +1,13 @@
-import { lmsDb, lmsLibsql } from "./client";
+import { lmsDb } from "./client";
 import { eq } from "drizzle-orm";
 import { tcClass, tcStudent, lmsUser, tcCourse, lmsPerson, enrollment } from "./schema";
 import { genId } from "@/lib/id";
+import { blindIndex, decryptFieldOpt, encryptFieldOpt } from "@/lib/lms/crypto";
 
 // Safe encrypt/index: nếu có key → mã hóa; nếu không (S1 local) → plaintext.
 function safeEncrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   try {
-    const { encryptFieldOpt } = require("@/lib/lms/crypto");
     return encryptFieldOpt(value) ?? value;
   } catch {
     return value; // no key → plaintext
@@ -15,7 +15,6 @@ function safeEncrypt(value: string | null | undefined): string | null {
 }
 function safeBlindIndex(value: string): string | null {
   try {
-    const { blindIndex } = require("@/lib/lms/crypto");
     return blindIndex(value);
   } catch {
     return null; // no key → skip index
@@ -27,7 +26,6 @@ function safeDecrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   if (typeof value === "string" && value.startsWith("v1:")) {
     try {
-      const { decryptFieldOpt } = require("@/lib/lms/crypto");
       return decryptFieldOpt(value);
     } catch {
       return value; // decrypt fail → return as-is

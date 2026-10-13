@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { lmsDb } from "@/db/lms/client";
 import { tcCodeProblem, tcTestCase, tcCodeSubmission, tcCodeRun, enrollment } from "@/db/lms/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { genId } from "@/lib/id";
 import { logAccess } from "@/lib/lms/audit";
 import { getSessionStudentId, getMyPersonId } from "@/lib/lms/portal-queries";
 import { getCodeJudge } from "@/lib/lms/code-judge";
+import { decryptFieldOpt, encryptFieldOpt } from "@/lib/lms/crypto";
 
 // P-LMS-4: Nộp code + chấm tự động (ADR-003 QĐ3).
 // sourceCode mã hóa at-rest. Test ẩn: CHỈ trả pass/fail.
@@ -14,7 +15,6 @@ function safeDecrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   if (typeof value === "string" && value.startsWith("v1:")) {
     try {
-      const { decryptFieldOpt } = require("@/lib/lms/crypto");
       return decryptFieldOpt(value);
     } catch { return value; }
   }
@@ -24,7 +24,6 @@ function safeDecrypt(value: string | null | undefined): string | null {
 function safeEncrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   try {
-    const { encryptFieldOpt } = require("@/lib/lms/crypto");
     return encryptFieldOpt(value) ?? value;
   } catch { return value; }
 }
@@ -94,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   // 8. Run judge
   let judge;
-  try { judge = await getCodeJudge(); } catch (e) {
+  try { judge = await getCodeJudge(); } catch {
     await lmsDb.update(tcCodeSubmission).set({ status: "error", verdict: "JUDGE_UNAVAILABLE" })
       .where(eq(tcCodeSubmission.id, subId));
     return err("Hệ thống chấm chưa sẵn sàng.", 503);

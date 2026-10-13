@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { lmsDb } from "@/db/lms/client";
 import { tcCertificate, tcCourse, lmsPerson } from "@/db/lms/schema";
 import { eq } from "drizzle-orm";
 import { getSessionStudentId, getMyPersonId } from "@/lib/lms/portal-queries";
+import { decryptFieldOpt } from "@/lib/lms/crypto";
 
 // P-LMS-5: Tải chứng chỉ dạng text (PDF stub).
 // PDF server-side render sẽ thay thế khi có lib PDF.
@@ -12,7 +13,6 @@ function safeDecrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   if (typeof value === "string" && value.startsWith("v1:")) {
     try {
-      const { decryptFieldOpt } = require("@/lib/lms/crypto");
       return decryptFieldOpt(value);
     } catch { return value; }
   }
