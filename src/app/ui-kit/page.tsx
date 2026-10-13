@@ -44,6 +44,8 @@ import { TaskTabs } from "@/app/(app)/tasks/TaskTabs";
 import { TasksClient } from "@/app/(app)/tasks/TasksClient";
 import { TaskDetail } from "@/app/(app)/tasks/TaskDetail";
 import { DoneList } from "@/app/(app)/tasks/DoneList";
+import { CalendarPreview } from "./CalendarPreview";
+import { FocusClient } from "@/app/(focus)/focus/FocusClient";
 
 export const metadata: Metadata = {
   title: "Bộ UI · justlife",
@@ -326,6 +328,22 @@ export default function UiKitPage() {
             <TaskDetail headingId="uikit-td" task={sampleTask({ id: "t2", title: "Chấm bài tập lớp Python buổi 5", area: "teach", effort: 2, impact: 5, priorityScore: 88, deadlineAt: NOW + 5 * 3600_000, note: "Nhắc bạn Minh An nộp bù bài buổi 4." })} />
           </div>
           <DoneList tasks={[sampleTask({ id: "d1", title: "Gửi biên bản họp KPI", status: "done", doneAt: NOW - 86_400_000 })]} />
+        </div>
+      </Block>
+
+      <Block title="Lịch — thành phần P2.3 (dữ liệu mẫu, chỉ để xem — đã khoá bấm)">
+        <div inert>
+          <CalendarPreview day0={NOW - (NOW % 86_400_000) - 7 * 3_600_000} />
+        </div>
+      </Block>
+
+      <Block title="Tập trung — thành phần P2.4 (dữ liệu mẫu, không ghi bộ nhớ — đã khoá bấm)">
+        <div inert className="bg-background overflow-hidden rounded-lg border">
+          <FocusClient
+            persist={false}
+            doing={[sampleTask({ id: "f1", title: "Chuẩn bị báo cáo doanh thu tuần", status: "doing", deadlineAt: NOW + 2 * 3600_000 })]}
+            next={sampleTask({ id: "f2", title: "Chấm bài tập lớp Python buổi 5", area: "teach" })}
+          />
         </div>
       </Block>
 
