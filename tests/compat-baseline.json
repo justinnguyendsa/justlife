@@ -1,0 +1,4 @@
+{
+  "total": 423,
+  "note": "ADR-005 3d (14/10/2026). Chỉ được giảm: khi một màn bỏ class cũ (btn, card, chip, field…) thì hạ số này xuống đúng bằng con số test báo."
+}
