@@ -46,6 +46,8 @@ import { TaskDetail } from "@/app/(app)/tasks/TaskDetail";
 import { DoneList } from "@/app/(app)/tasks/DoneList";
 import { CalendarPreview } from "./CalendarPreview";
 import { FocusClient } from "@/app/(focus)/focus/FocusClient";
+import { SettingsClient } from "@/app/(app)/settings/SettingsClient";
+import type { FixedSchedule } from "@/db/schema";
 
 export const metadata: Metadata = {
   title: "Bộ UI · justlife",
@@ -73,6 +75,12 @@ const AREAS = [
 
 // Dữ liệu mẫu CỐ ĐỊNH (không đọc DB) chỉ để soi giao diện component thật.
 const NOW = Date.UTC(2026, 8, 18, 3, 0, 0);
+
+const SAMPLE_FIXED: FixedSchedule[] = [
+  { id: "x1", label: "Giờ làm việc", area: "work", startMin: 510, endMin: 1080, weekdayMask: 0b0011111, createdAt: NOW },
+  { id: "x2", label: "Dạy lớp Python K12", area: "teach", startMin: 840, endMin: 930, weekdayMask: 0b0001010, createdAt: NOW },
+  { id: "x3", label: "Học cao học", area: "study", startMin: 480, endMin: 690, weekdayMask: 0b0100000, createdAt: NOW },
+];
 
 function sampleTask(over: Partial<Task>): Task {
   return {
@@ -343,6 +351,16 @@ export default function UiKitPage() {
             persist={false}
             doing={[sampleTask({ id: "f1", title: "Chuẩn bị báo cáo doanh thu tuần", status: "doing", deadlineAt: NOW + 2 * 3600_000 })]}
             next={sampleTask({ id: "f2", title: "Chấm bài tập lớp Python buổi 5", area: "teach" })}
+          />
+        </div>
+      </Block>
+
+      <Block title="Cài đặt — thành phần P2.5 (dữ liệu mẫu — đã khoá bấm)">
+        <div inert>
+          <SettingsClient
+            wip={2}
+            account={{ enabled: true, email: "minh•••••@gmail.com" }}
+            fixed={SAMPLE_FIXED}
           />
         </div>
       </Block>

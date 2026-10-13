@@ -1,79 +1,106 @@
 "use client";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Trash2, Plus } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { Plus } from "lucide-react";
+
 import type { FixedSchedule } from "@/db/schema";
-import { addFixedSchedule, deleteFixedSchedule } from "@/app/actions/schedule";
-import { setSetting } from "@/app/actions/settings";
-import { AREAS, AREA_VAR } from "@/lib/areas";
-import { minToHHMM } from "@/lib/format";
-import { WEEKDAYS } from "@/lib/scheduler";
+import { setWipLimit } from "@/app/actions/settings";
 import { toast } from "@/components/Toaster";
+import { Segmented } from "@/components/Segmented";
+import { ThemeSetting } from "@/components/ThemeSetting";
+import { OwnerSignOutButton } from "@/components/OwnerSignOutButton";
+import { Button } from "@/components/ui/button";
+import { FixedEditor } from "./FixedEditor";
+import { FixedList } from "./FixedList";
 
-const toMin = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
-const maskLabel = (mask: number) => WEEKDAYS.filter((_, i) => mask & (1 << i)).join(" ");
+export type Account = { enabled: boolean; email: string | null };
 
-export function SettingsClient({ fixed, wip }: { fixed: FixedSchedule[]; wip: number }) {
-  const router = useRouter();
+const WIP_OPTIONS = [
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+  { value: "0", label: "Không giới hạn" },
+];
+
+// Màn Cài đặt (SPEC-UI-P2.5, canvas J08). Web: trái Giờ bận, phải Giới hạn · Giao diện · Tài khoản.
+// Phần Đồng bộ với justudy chưa hiện cho tới F6. `email` nhận vào đã được che ở server.
+export function SettingsClient({ fixed, wip, account }: { fixed: FixedSchedule[]; wip: number; account: Account }) {
+  const [editing, setEditing] = useState<FixedSchedule | "new" | null>(null);
+  const [w, setW] = useState(String(wip));
+  const saved = useRef(String(wip)); // giá trị server đã nhận gần nhất
+  const latest = useRef(String(wip)); // lựa chọn mới nhất của người dùng
   const [, start] = useTransition();
-  const [w, setW] = useState(wip);
-  const [adding, setAdding] = useState(false);
-  const [label, setLabel] = useState("");
-  const [area, setArea] = useState("work");
-  const [s, setS] = useState("08:30");
-  const [e, setE] = useState("18:00");
-  const [days, setDays] = useState<number[]>([0, 1, 2, 3, 4]);
 
-  function saveWip(v: number) { setW(v); start(async () => { await setSetting("wip_limit", String(v)); }); }
-  function del(id: string) { start(async () => { await deleteFixedSchedule(id); router.refresh(); toast("Đã xóa khối"); }); }
-  function add() {
-    if (!label.trim()) { toast("Nhập tên khối", true); return; }
-    if (toMin(e) <= toMin(s)) { toast("Giờ kết thúc phải sau giờ bắt đầu", true); return; }
-    const mask = days.reduce((m, d) => m | (1 << d), 0);
+  // Giá trị cũ ngoài 1/2/3/không giới hạn (vd. 5) vẫn hiện để không mất.
+  const wipOptions = WIP_OPTIONS.some((o) => o.value === w) ? WIP_OPTIONS : [...WIP_OPTIONS.slice(0, 3), { value: w, label: w }, WIP_OPTIONS[3]];
+
+  const saveWip = (v: string) => {
+    latest.current = v;
+    setW(v);
+    // Lỗi chỉ trả về giá trị đã lưu khi đây vẫn là lựa chọn mới nhất (bấm nhanh 2 lần không bị lệch).
+    const revert = () => { if (latest.current === v) { latest.current = saved.current; setW(saved.current); } };
     start(async () => {
-      const r = await addFixedSchedule({ label: label.trim(), area, startMin: toMin(s), endMin: toMin(e), weekdayMask: mask });
-      if (!r.ok) { toast(r.error || "Lỗi", true); return; }
-      setAdding(false); setLabel(""); router.refresh(); toast("Đã thêm khối cố định");
+      try {
+        const r = await setWipLimit(Number(v));
+        if (!r.ok) {
+          revert();
+          return toast(r.error, true);
+        }
+        saved.current = v;
+        toast(v === "0" ? "Đã bỏ giới hạn việc đang làm" : `Tối đa ${v} việc đang làm cùng lúc`);
+      } catch {
+        revert();
+        toast("Chưa lưu được — kiểm tra kết nối rồi thử lại", true);
+      }
     });
-  }
+  };
+
+  const block = editing === "new" ? null : editing;
 
   return (
-    <>
-      <div className="sec"><h2><span className="secdot" style={{ background: "var(--brand)" }} />Khối thời gian cố định</h2></div>
-      <div className="card">
-        {fixed.length === 0 && <div className="empty">Chưa có khối cố định nào.</div>}
-        {fixed.map((f) => (
-          <div className="setrow" key={f.id}>
-            <div>
-              <div className="l"><span className="secdot" style={{ background: AREA_VAR[f.area], display: "inline-block", marginRight: 6 }} />{f.label}</div>
-              <div className="d">{maskLabel(f.weekdayMask)} · {minToHHMM(f.startMin)}–{minToHHMM(f.endMin)}</div>
-            </div>
-            <button className="btn line sm" onClick={() => del(f.id)} aria-label="Xóa"><Trash2 strokeWidth={1.9} /></button>
+    <div className="grid max-w-[1000px] items-start gap-5 md:grid-cols-[minmax(0,1fr)_320px]">
+      <section aria-labelledby="set-fixed" className="bg-card flex flex-col gap-3 rounded-lg border p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 id="set-fixed" className="text-[17px] leading-6 font-semibold">Giờ bận cố định</h2>
+            <p className="text-muted-foreground text-[13px]">Lịch và gợi ý xếp việc sẽ né các khung này.</p>
           </div>
-        ))}
-        {!adding && <button className="btn ghost block" style={{ marginTop: 10 }} onClick={() => setAdding(true)}><Plus strokeWidth={2} />Thêm khối cố định</button>}
-        {adding && (
-          <div style={{ marginTop: 12 }}>
-            <div className="field"><label>Tên khối</label><input value={label} onChange={(ev) => setLabel(ev.target.value)} placeholder="VD: Dạy DA02" /></div>
-            <div className="field"><label>Mảng</label><div className="areapick">{AREAS.map((a) => <div key={a.key} className={`a ${a.key}${area === a.key ? " on" : ""}`} onClick={() => setArea(a.key)}>{a.label}</div>)}</div></div>
-            <div className="row2"><div className="field"><label>Bắt đầu</label><input type="time" value={s} onChange={(ev) => setS(ev.target.value)} /></div><div className="field"><label>Kết thúc</label><input type="time" value={e} onChange={(ev) => setE(ev.target.value)} /></div></div>
-            <div className="field"><label>Lặp lại</label><div className="filters">{WEEKDAYS.map((d, i) => <span key={i} className={"fil" + (days.includes(i) ? " on" : "")} onClick={() => setDays((p) => p.includes(i) ? p.filter((x) => x !== i) : [...p, i])}>{d}</span>)}</div></div>
-            <div className="row2"><button className="btn line block" onClick={() => setAdding(false)}>Hủy</button><button className="btn primary block" onClick={add}>Lưu khối</button></div>
-          </div>
-        )}
-      </div>
-
-      <div className="sec"><h2><span className="secdot" style={{ background: "var(--accent)" }} />Giới hạn tập trung (WIP)</h2></div>
-      <div className="card">
-        <div className="setrow">
-          <div><div className="l">Số việc làm cùng lúc</div><div className="d">Chống nhảy việc · nhắc nhẹ khi vượt</div></div>
-          <div className="stepper"><button onClick={() => saveWip(Math.max(1, w - 1))}>–</button><span className="v">{w}</span><button onClick={() => saveWip(Math.min(10, w + 1))}>+</button></div>
+          <Button variant="outline" size="sm" className="h-11 shrink-0 md:h-8" onClick={() => setEditing("new")}>
+            <Plus aria-hidden="true" />
+            Thêm khung
+          </Button>
         </div>
-      </div>
-      <p className="muted" style={{ fontSize: 12, padding: "0 4px" }}>Khi đang làm vượt số này, app nhắc nhẹ — không chặn cứng, vì đôi khi bạn cần linh hoạt.</p>
+        <FixedList fixed={fixed} onEdit={setEditing} />
+      </section>
 
-      <div className="sec"><h2><span className="secdot" style={{ background: "var(--module-study)" }} />Đồng bộ &amp; dữ liệu</h2></div>
-      <div className="card"><div className="setrow"><div><div className="l">Đồng bộ máy ↔ điện thoại</div><div className="d">local-first · libSQL/Turso · mã hóa field nhạy cảm</div></div><span className="chip st doing">sẵn sàng</span></div></div>
-    </>
+      <div className="flex flex-col gap-5">
+        <section aria-labelledby="set-wip" className="bg-card flex flex-col gap-3 rounded-lg border p-5">
+          <h2 id="set-wip" className="text-[17px] leading-6 font-semibold">Giới hạn đang làm</h2>
+          <p className="text-muted-foreground text-[13px]">Khi đã đủ số việc đang làm, app nhắc bạn tạm dừng một việc trước khi bắt đầu việc mới.</p>
+          <Segmented options={wipOptions} value={w} onChange={saveWip} ariaLabel="Số việc đang làm cùng lúc" className="flex [&>button]:flex-auto [&>button]:px-3 [&>button]:whitespace-nowrap" />
+        </section>
+
+        <section aria-labelledby="set-theme" className="bg-card flex flex-col gap-3 rounded-lg border p-5">
+          <h2 id="set-theme" className="text-[17px] leading-6 font-semibold">Giao diện</h2>
+          <p className="text-muted-foreground text-[13px]">Áp cho cả justlife và justudy trên máy này.</p>
+          <ThemeSetting />
+        </section>
+
+        <section aria-labelledby="set-account" className="bg-card flex flex-col items-start gap-3 rounded-lg border p-5">
+          <h2 id="set-account" className="text-[17px] leading-6 font-semibold">Tài khoản</h2>
+          {account.enabled ? (
+            <>
+              <p className="text-muted-foreground text-[13px]">Đăng nhập bằng Google{account.email ? ` · ${account.email}` : ""}</p>
+              <OwnerSignOutButton />
+            </>
+          ) : (
+            <p className="text-muted-foreground text-[13px]">Đăng nhập chủ sở hữu đang tắt trên máy này.</p>
+          )}
+        </section>
+      </div>
+
+      {editing !== null && (
+        <FixedEditor key={block?.id ?? "new"} open block={block} onOpenChange={(v) => { if (!v) setEditing(null); }} />
+      )}
+    </div>
   );
 }

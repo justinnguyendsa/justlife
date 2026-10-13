@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { fixedSchedule, timeBlock } from "@/db/schema";
 import { detectConflicts, startOfDay, type Conflict } from "@/lib/scheduler";
 import { genId } from "@/lib/id";
+import { validateFixed, type FixedInput } from "@/lib/fixed-schedule";
 
 const DAY = 86_400_000;
 
@@ -46,11 +47,12 @@ export async function deleteTimeBlock(id: string) {
   return { ok: true };
 }
 
-export async function addFixedSchedule(input: { label: string; area: string; startMin: number; endMin: number; weekdayMask: number }) {
+export async function addFixedSchedule(input: FixedInput) {
   await requireOwner();
 
-  if (input.endMin <= input.startMin) return { ok: false, error: "Giờ kết thúc phải sau giờ bắt đầu" };
-  await db.insert(fixedSchedule).values({ id: genId(), ...input, createdAt: Date.now() });
+  const v = validateFixed(input);
+  if (!v.ok) return { ok: false, error: v.error };
+  await db.insert(fixedSchedule).values({ id: genId(), ...v.value, createdAt: Date.now() });
   revalidatePath("/settings"); revalidatePath("/calendar"); revalidatePath("/today");
   return { ok: true };
 }
@@ -65,16 +67,23 @@ export async function deleteFixedSchedule(id: string) {
 
 export async function updateFixedSchedule(
   id: string,
-  input: { label?: string; area?: string; startMin?: number; endMin?: number; weekdayMask?: number }
+  input: Partial<FixedInput>
 ) {
   await requireOwner();
 
-  if (input.startMin !== undefined && input.endMin !== undefined) {
-    if (input.endMin <= input.startMin) return { ok: false, error: "Giờ kết thúc phải sau giờ bắt đầu" };
-  }
   const existing = await db.select().from(fixedSchedule).where(eq(fixedSchedule.id, id)).limit(1);
-  if (!existing[0]) return { ok: false, error: "Không tìm thấy khối lịch" };
-  await db.update(fixedSchedule).set(input).where(eq(fixedSchedule.id, id));
+  const cur = existing[0];
+  if (!cur) return { ok: false, error: "Không tìm thấy khối lịch" };
+  // Gộp với bản ghi hiện có rồi mới kiểm — sửa riêng giờ bắt đầu hay kết thúc vẫn được kiểm đủ.
+  const v = validateFixed({
+    label: input.label ?? cur.label,
+    area: input.area ?? cur.area,
+    startMin: input.startMin ?? cur.startMin,
+    endMin: input.endMin ?? cur.endMin,
+    weekdayMask: input.weekdayMask ?? cur.weekdayMask,
+  });
+  if (!v.ok) return { ok: false, error: v.error };
+  await db.update(fixedSchedule).set(v.value).where(eq(fixedSchedule.id, id));
   revalidatePath("/settings"); revalidatePath("/calendar"); revalidatePath("/today");
   return { ok: true };
 }

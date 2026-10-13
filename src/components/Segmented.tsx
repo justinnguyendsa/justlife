@@ -2,10 +2,10 @@
 import { cn } from "@/lib/utils";
 
 // Nhóm nút chọn 1 (role radio) — dùng cho mảng, công sức, tác động.
-// `value` rỗng = chưa chọn mục nào (vd. công sức chưa đặt).
-export function Segmented({ options, value, onChange, ariaLabel }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void; ariaLabel: string }) {
+// `value` rỗng = chưa chọn mục nào (vd. công sức chưa đặt). `className` để đổi cách chia cột (vd. nhãn dài).
+export function Segmented({ options, value, onChange, ariaLabel, className }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void; ariaLabel: string; className?: string }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="bg-muted grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] p-[3px]">
+    <div role="radiogroup" aria-label={ariaLabel} className={cn("bg-muted grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] p-[3px]", className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (

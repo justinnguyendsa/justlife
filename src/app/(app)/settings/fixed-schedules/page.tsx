@@ -1,11 +1,6 @@
-import { db } from "@/db/client";
-import { fixedSchedule } from "@/db/schema";
-import { desc } from "drizzle-orm";
-import { FixedSchedulesClient } from "./FixedSchedulesClient";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function FixedSchedulesPage() {
-  const schedules = await db.select().from(fixedSchedule).orderBy(desc(fixedSchedule.createdAt));
-  return <FixedSchedulesClient schedules={schedules} />;
+// Màn giờ bận cũ đã gộp vào Cài đặt (SPEC-UI-P2.5 F09). Giữ đường dẫn cũ cho bookmark.
+export default function FixedSchedulesPage() {
+  redirect("/settings");
 }

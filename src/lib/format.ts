@@ -27,6 +27,12 @@ export function fmtDuration(minutes: number): string {
   return m === 0 ? `${h} giờ` : `${h} giờ ${String(m).padStart(2, "0")}`;
 }
 
+// "HH:MM" → số phút trong ngày; sai định dạng → NaN (để validate báo "Giờ không hợp lệ").
+export function hhmmToMin(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : NaN;
+}
+
 export function minToHHMM(min: number): string {
   const h = Math.floor(min / 60), m = min % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -51,4 +57,13 @@ export const AREA_LABEL: Record<string, string> = { work: "việc", teach: "dạ
 // Khóa ngày YYYY-MM-DD theo Asia/HCM (cho habit streak / rest).
 export function dateKey(ms: number = Date.now()): string {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ }).format(ms);
+}
+
+// Che email khi hiển thị (SPEC-UI-P2.5 B06): "minhnn2511@gmail.com" → "minh•••••@gmail.com".
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return "•••••";
+  const local = email.slice(0, at);
+  const keep = local.length > 4 ? 4 : 1; // phần trước @ ngắn thì chỉ giữ 1 ký tự, không lộ cả tên
+  return `${local.slice(0, keep)}•••••${email.slice(at)}`;
 }

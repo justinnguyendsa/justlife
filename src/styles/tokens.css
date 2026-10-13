@@ -15,6 +15,7 @@
    ============================================================ */
 
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
 
   /* Nền & chữ */
@@ -119,6 +120,7 @@
 /* Dark mode — hỗ trợ CẢ hai: .dark (chuẩn shadcn) và [data-theme="dark"] (toggle sẵn có của justlife) */
 .dark,
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --background: oklch(0.18 0.025 254);
   --foreground: oklch(0.96 0.006 250);
 
