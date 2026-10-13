@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SESSION_MS, fmtClock, pauseTimer, progressPct, remainingOf, resumeTimer, startTimer } from "@/lib/focus-timer";
+import { SESSION_MS, fmtClock, parseClock, pauseTimer, progressPct, remainingOf, resumeTimer, startTimer } from "@/lib/focus-timer";
 
 // SPEC-UI-P2.4 F08 — đồng hồ tính theo endsAt nên tab ẩn (tick chậm) vẫn đúng giờ.
 const T0 = 1_000_000;
@@ -29,5 +29,16 @@ describe("focus-timer", () => {
     expect(progressPct(SESSION_MS)).toBe(0);
     expect(progressPct(SESSION_MS * 0.75)).toBe(25);
     expect(progressPct(0)).toBe(100);
+  });
+
+  it("đọc đồng hồ đã lưu: đúng hình dạng thì nhận, hỏng/thiếu trường thì bỏ", () => {
+    const ok = { ...startTimer("t1", T0), segStart: T0 };
+    expect(parseClock(JSON.stringify(ok))).toEqual({ ...ok, ended: false });
+    expect(parseClock(JSON.stringify({ ...ok, ended: true }))?.ended).toBe(true);
+    expect(parseClock(null)).toBeNull();
+    expect(parseClock("{hỏng")).toBeNull();
+    expect(parseClock("null")).toBeNull();
+    expect(parseClock(JSON.stringify({ taskId: "t1", running: true, endsAt: T0 }))).toBeNull();
+    expect(parseClock(JSON.stringify({ ...ok, endsAt: "x" }))).toBeNull();
   });
 });

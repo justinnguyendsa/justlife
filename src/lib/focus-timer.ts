@@ -11,6 +11,9 @@ export type TimerState = {
   remainingMs: number; // khi tạm dừng
 };
 
+/** Trạng thái màn Tập trung: đồng hồ + mốc đầu đoạn đang chạy (để cộng phút) + cờ hết phiên. */
+export type FocusClock = TimerState & { segStart: number; ended?: boolean };
+
 export function remainingOf(s: TimerState, now: number): number {
   return Math.max(0, s.running ? s.endsAt - now : s.remainingMs);
 }
@@ -42,16 +45,31 @@ export function progressPct(remainingMs: number): number {
 const TIMER_KEY = "jl-focus-timer";
 const statsKey = (day: string) => `jl-focus-${day}`;
 
-export function loadTimer(): TimerState | null {
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/** Đọc chuỗi đã lưu; sai hình dạng (hỏng, bản cũ) → null thay vì hiện NaN:NaN. */
+export function parseClock(raw: string | null): FocusClock | null {
+  if (!raw) return null;
   try {
-    const raw = sessionStorage.getItem(TIMER_KEY);
-    return raw ? (JSON.parse(raw) as TimerState) : null;
+    const v = JSON.parse(raw) as Partial<FocusClock> | null;
+    if (!v || typeof v !== "object") return null;
+    if (typeof v.taskId !== "string" || typeof v.running !== "boolean") return null;
+    if (!isNum(v.endsAt) || !isNum(v.remainingMs) || !isNum(v.segStart)) return null;
+    return { taskId: v.taskId, running: v.running, endsAt: v.endsAt, remainingMs: v.remainingMs, segStart: v.segStart, ended: v.ended === true };
   } catch {
     return null;
   }
 }
 
-export function saveTimer(s: TimerState | null) {
+export function loadTimer(): FocusClock | null {
+  try {
+    return parseClock(sessionStorage.getItem(TIMER_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function saveTimer(s: FocusClock | null) {
   try {
     if (s) sessionStorage.setItem(TIMER_KEY, JSON.stringify(s));
     else sessionStorage.removeItem(TIMER_KEY);

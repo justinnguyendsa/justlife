@@ -13,6 +13,7 @@ import {
   SESSION_MS,
   SESSIONS_PER_DAY,
   addStats,
+  type FocusClock,
   fmtClock,
   loadStats,
   loadTimer,
@@ -22,14 +23,13 @@ import {
   resumeTimer,
   saveTimer,
   startTimer,
-  type TimerState,
 } from "@/lib/focus-timer";
 import { toast } from "@/components/Toaster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Clock = TimerState & { segStart: number; ended?: boolean };
+type Clock = FocusClock;
 
 const subscribeNothing = () => () => {};
 
@@ -44,19 +44,23 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
   const [now, setNow] = useState(() => Date.now());
   const [clock, setClock] = useState<Clock | null>(() => {
     if (typeof window === "undefined") return null;
-    const saved = persist ? (loadTimer() as Clock | null) : null;
-    return saved ?? { ...startTimer("", Date.now()), segStart: Date.now() };
+    const t = Date.now();
+    const saved = persist ? loadTimer() : null;
+    // Đồng hồ cũ của ngày khác thì bỏ — không cộng phút hôm qua vào hôm nay.
+    if (saved && dateKey(saved.segStart) === dateKey(t)) return saved;
+    return doing[0] ? { ...startTimer(doing[0].id, t), segStart: t } : null;
   });
   const [stats, setStats] = useState(() => (typeof window === "undefined" || !persist ? { sessions: 0, minutes: 0 } : loadStats(dateKey())));
   const [idea, setIdea] = useState("");
   const clockRef = useRef(clock);
+  const capturing = useRef(false);
 
   const task = doing[index % Math.max(1, doing.length)] ?? null;
 
   // Ghi đồng hồ mỗi khi đổi trạng thái; ref dùng cho nhịp 1 giây (đọc giá trị mới nhất).
   useEffect(() => {
     clockRef.current = clock;
-    if (clock && persist) saveTimer(clock);
+    if (persist) saveTimer(clock);
   }, [clock, persist]);
 
   // Nhịp 1 giây + phát hiện hết phiên (so endsAt với giờ thật).
@@ -73,8 +77,8 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
     return () => clearInterval(id);
   }, [persist]);
 
-  const remaining = clock ? remainingOf(clock, now) : SESSION_MS;
-  // Chỉ dùng trạng thái đồng hồ sau khi gắn vào trình duyệt — server không biết đồng hồ (tránh lệch hydrate).
+  // Chỉ dùng đồng hồ sau khi gắn vào trình duyệt — server luôn thấy 25:00 (tránh lệch hydrate khi khôi phục).
+  const remaining = mounted && clock ? remainingOf(clock, now) : SESSION_MS;
   const ended = mounted && Boolean(clock?.ended);
   const running = mounted && Boolean(clock?.running) && !ended;
   const liveMin = stats.minutes + (running && clock ? Math.max(0, now - clock.segStart) / 60_000 : 0);
@@ -86,8 +90,11 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
   };
 
   const togglePause = () => {
-    if (!clock) return;
     const t = Date.now();
+    if (!clock) {
+      if (task) setClock({ ...startTimer(task.id, t), segStart: t });
+      return;
+    }
     if (running) {
       bank(clock, t);
       setClock({ ...pauseTimer(clock, t), segStart: t });
@@ -119,10 +126,14 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
       try {
         const r = await setTaskStatus(task.id, "done");
         if (!r.ok) return toast("Chưa lưu được, thử lại nhé", true);
-        if (clock) {
-          const t = Date.now();
-          bank(clock, t);
-          setClock({ ...clock, segStart: t });
+        const c = clockRef.current;
+        const t = Date.now();
+        if (c && c.running && !c.ended) {
+          bank(c, t);
+          // Hết việc đang làm thì dừng đồng hồ; còn việc thì phiên chạy tiếp với việc kế.
+          setClock(doing.length > 1 ? { ...c, segStart: t } : null);
+        } else if (doing.length <= 1) {
+          setClock(null);
         }
         toast(`Đã xong: ${task.title}`);
         setIndex(0);
@@ -140,15 +151,23 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
 
   const capture = () => {
     const title = idea.trim();
-    if (!title) return;
+    if (!title || capturing.current) return;
+    capturing.current = true;
+    setIdea(""); // xoá ngay để Enter lần hai không tạo việc trùng
+    const restore = () => setIdea((cur) => cur || title);
     start(async () => {
       try {
         const r = await createTask({ title, area: task?.area ?? "work", deadlineAt: null, effort: null, impact: null });
-        if (r && "ok" in r && !r.ok) return toast("Chưa ghi được ý này, thử lại nhé", true);
-        setIdea("");
+        if (r && "ok" in r && !r.ok) {
+          restore();
+          return toast("Chưa ghi được ý này, thử lại nhé", true);
+        }
         toast("Đã ghi vào Hộp việc — quay lại việc đang làm thôi");
       } catch {
+        restore();
         toast("Chưa ghi được — kiểm tra kết nối rồi thử lại", true);
+      } finally {
+        capturing.current = false;
       }
     });
   };
@@ -206,12 +225,13 @@ export function FocusClient({ doing, next, persist = true }: { doing: Task[]; ne
               <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
                 <Button className="h-11 md:h-10 md:min-w-[180px]" onClick={rest5} disabled={pending}><Coffee aria-hidden="true" />Nghỉ 5 phút</Button>
                 <Button variant="outline" className="h-11 md:h-10" onClick={newSession}><Play aria-hidden="true" />Phiên tiếp</Button>
+                <Button variant="ghost" className="h-11 md:h-10" onClick={done} disabled={pending}><Check aria-hidden="true" />Xong việc này</Button>
               </div>
             ) : (
               <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:gap-3">
                 <Button variant="outline" className="order-2 h-11 md:order-1 md:h-10 md:min-w-[140px]" onClick={togglePause} disabled={!mounted}>
                   {running ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
-                  {running ? "Tạm dừng" : "Tiếp tục"}
+                  {running ? "Tạm dừng" : mounted && !clock ? "Bắt đầu" : "Tiếp tục"}
                 </Button>
                 <Button className="order-1 h-11 md:order-2 md:h-10 md:min-w-[200px]" onClick={done} disabled={pending}>
                   <Check aria-hidden="true" />
