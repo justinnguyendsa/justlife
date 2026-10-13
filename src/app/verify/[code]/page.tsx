@@ -51,7 +51,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
   const displayName = safeDecrypt(person?.displayName) ?? "Học viên";
 
   const issuedDate = new Date(cert.issuedAt).toLocaleDateString("vi-VN", {
-    day: "2-digit", month: "2-digit", year: "numeric",
+    day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh",
   });
 
   return (

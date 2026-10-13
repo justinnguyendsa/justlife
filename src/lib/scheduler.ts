@@ -48,6 +48,11 @@ export function parseVnDate(dateStr: string): number {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? Date.parse(`${dateStr}T00:00:00+07:00`) : NaN;
 }
 
+// "YYYY-MM-DD" → 23:59:59 giờ Việt Nam của ngày đó (mốc hạn chót "hết ngày").
+export function endOfVnDate(dateStr: string): number {
+  return parseVnDate(dateStr) + DAY_MS - 1000;
+}
+
 // Quy đổi 1 fixed_schedule (phút trong ngày) → khoảng epoch ms cho 1 ngày cụ thể.
 export function fixedToRange(f: FixedSchedule, dayStart: number): { startAt: number; endAt: number } {
   return { startAt: dayStart + f.startMin * 60_000, endAt: dayStart + f.endMin * 60_000 };

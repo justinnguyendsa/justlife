@@ -51,3 +51,14 @@ describe("lịch cố định rơi đúng thứ và đúng giờ", () => {
     expect(detectConflicts(vn("2026-10-13T13:00:00"), vn("2026-10-13T13:00:00") + H, [fixed], [])).toHaveLength(0);
   });
 });
+
+describe("hạn chót hết ngày", () => {
+  it("endOfVnDate trả 23:59:59 giờ VN", async () => {
+    const { endOfVnDate } = await import("@/lib/scheduler");
+    expect(endOfVnDate("2026-10-13")).toBe(vn("2026-10-13T23:59:59"));
+  });
+  it("dateKey của hạn 00:30 VN vẫn là ngày VN (ô sửa hạn không lùi 1 ngày)", async () => {
+    const { dateKey } = await import("@/lib/format");
+    expect(dateKey(vn("2026-10-13T00:30:00"))).toBe("2026-10-13");
+  });
+});

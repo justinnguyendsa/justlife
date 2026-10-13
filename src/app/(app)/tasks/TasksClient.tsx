@@ -6,7 +6,8 @@ import type { Task } from "@/db/schema";
 import { updateTask, deleteTask, setTaskStatus } from "@/app/actions/tasks";
 import { calcPriorityScore } from "@/lib/priority";
 import { AREA_VAR, AREA_LABEL } from "@/lib/areas";
-import { countdown } from "@/lib/format";
+import { countdown, dateKey } from "@/lib/format";
+import { endOfVnDate } from "@/lib/scheduler";
 import { toast } from "@/components/Toaster";
 
 // Bộ lọc theo mảng đời sống (US-02). "all" = không lọc.
@@ -65,7 +66,7 @@ export function TasksClient({ initial, wipLimit }: { initial: Task[]; wipLimit: 
     setEditTitle(open.title);
     setEditNote(open.note ?? "");
     setEditDeadline(
-      open.deadlineAt ? new Date(open.deadlineAt).toISOString().split("T")[0] : ""
+      open.deadlineAt ? dateKey(open.deadlineAt) : ""
     );
   }, [open]);
 
@@ -98,7 +99,7 @@ export function TasksClient({ initial, wipLimit }: { initial: Task[]; wipLimit: 
         effort,
         impact,
         deadlineAt: editDeadline
-          ? new Date(editDeadline + "T23:59:59").getTime()
+          ? endOfVnDate(editDeadline)
           : open.deadlineAt,
       })
     : null;
@@ -127,7 +128,7 @@ export function TasksClient({ initial, wipLimit }: { initial: Task[]; wipLimit: 
       return;
     }
     const newDeadlineAt = editDeadline
-      ? new Date(editDeadline + "T23:59:59").getTime()
+      ? endOfVnDate(editDeadline)
       : null;
     start(async () => {
       const res = await updateTask(t.id, {

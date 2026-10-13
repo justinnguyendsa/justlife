@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { endOfVnDate } from "@/lib/scheduler";
 
 const AREA_ACTIVE: Record<string, string> = {
   work: "border-area-work bg-area-work/12 text-area-work-foreground",
@@ -76,7 +77,7 @@ export function AddTask() {
   const [pending, start] = useTransition();
   const router = useRouter();
 
-  const deadlineAt = deadline ? new Date(deadline + "T23:59:59").getTime() : null;
+  const deadlineAt = deadline ? endOfVnDate(deadline) : null;
   const score = calcPriorityScore({ effort, impact, deadlineAt });
 
   function reset() {

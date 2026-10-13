@@ -1,6 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
+// Chạy test với giờ UTC như server Vercel: lỗi tính ngày theo giờ máy sẽ lộ ra ngay ở máy dev
+// (máy đặt giờ Việt Nam che mất lỗi). Đặt trước khi worker khởi động nên mọi Date đều theo UTC.
+process.env.TZ = 'UTC';
+
 export default defineConfig({
   test: {
     environment: 'node',
