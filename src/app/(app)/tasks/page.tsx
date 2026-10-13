@@ -6,11 +6,13 @@ import { TaskTabs, type TaskTab } from "./TaskTabs";
 import { TasksClient } from "./TasksClient";
 import { DueList } from "./DueList";
 import { DoneList } from "./DoneList";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 // Màn Việc (SPEC-UI-P2.2, canvas J02): 3 tab Tất cả · Hạn · Đã xong — tab nằm trên URL (?tab=).
 export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const sp = searchParams ? await searchParams : {};
   const tab: TaskTab = sp.tab === "han" ? "han" : sp.tab === "xong" ? "xong" : "tat-ca";
   // eslint-disable-next-line react-hooks/purity -- server component: chỉ render 1 lần mỗi request

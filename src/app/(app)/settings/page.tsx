@@ -7,11 +7,13 @@ import { maskEmail } from "@/lib/format";
 import { parseWipLimit } from "@/lib/wip";
 import { PageHeader } from "@/components/PageHeader";
 import { SettingsClient } from "./SettingsClient";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 // Màn Cài đặt (SPEC-UI-P2.5 F01). Email chỉ đi xuống client ở dạng đã che.
 export default async function SettingsPage() {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const [fixed, settings, session] = await Promise.all([
     db.select().from(fixedSchedule).orderBy(asc(fixedSchedule.startMin)),
     getSettings(),

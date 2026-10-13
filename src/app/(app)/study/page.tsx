@@ -1,6 +1,7 @@
 import { listCourses, getUpcomingStudy } from "@/db/study";
 import { PageHeader } from "@/components/PageHeader";
 import { StudyClient } from "./StudyClient";
+import { requireOwner } from "@/lib/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 // gộp item mọi môn. Đọc dữ liệu phía server (kèm số mục/đã xong/bài gần hạn nhất),
 // trao cho island tương tác StudyClient.
 export default async function StudyPage() {
+  await requireOwner(); // chặn phía server, không chỉ dựa vào middleware (ADR-005 3a)
   const [courses, upcoming] = await Promise.all([
     listCourses(),
     getUpcomingStudy(Date.now()),
