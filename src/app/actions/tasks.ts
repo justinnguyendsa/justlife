@@ -2,12 +2,13 @@
 
 import { requireOwner } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
-import { eq, and, ne, inArray } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { task, deadline, userSettings } from "@/db/schema";
 import { calcPriorityScore } from "@/lib/priority";
 import { buildDeadlineRows } from "@/lib/escalation";
 import { genId } from "@/lib/id";
+import { isWipExceeded, parseWipLimit } from "@/lib/wip";
 
 const TASK_AREAS = ["work", "teach", "study", "growth"];
 
@@ -26,16 +27,14 @@ async function rebuildDeadlines(taskId: string, deadlineAt: number | null) {
   }
 }
 
-/** Đọc WIP limit từ settings (mặc định 3) */
+/** Đọc WIP limit từ settings (mặc định 3, 0 = không giới hạn) */
 async function getWipLimit(): Promise<number> {
   const row = await db
     .select()
     .from(userSettings)
     .where(eq(userSettings.key, "wip_limit"))
     .limit(1);
-  const raw = row[0]?.value;
-  const parsed = raw != null ? parseInt(raw, 10) : NaN;
-  return isNaN(parsed) ? 3 : parsed;
+  return parseWipLimit(row[0]?.value);
 }
 
 /** Đếm số task đang 'doing', tùy chọn bỏ qua 1 task */
@@ -129,7 +128,7 @@ export async function updateTask(
   if (data.status === "doing") {
     const limit = await getWipLimit();
     const current = await countDoingTasks(id);
-    if (current >= limit) {
+    if (isWipExceeded(current, limit)) {
       return { ok: false, wip_exceeded: true, current, limit };
     }
   }
@@ -212,7 +211,7 @@ export async function setTaskStatus(id: string, status: string) {
   if (status === "doing") {
     const limit = await getWipLimit();
     const current = await countDoingTasks(id);
-    if (current >= limit) {
+    if (isWipExceeded(current, limit)) {
       return { ok: false, wip_exceeded: true, current, limit };
     }
   }

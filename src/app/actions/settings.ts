@@ -6,18 +6,21 @@ import { inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { userSettings, event } from "@/db/schema";
 import { genId } from "@/lib/id";
+import { isValidWipLimit } from "@/lib/wip";
 
-// ─── SET ──────────────────────────────────────────────────────────────────────
+// ─── GIỚI HẠN ĐANG LÀM (SPEC-UI-P2.5 B03) ─────────────────────────────────────
 
-export async function setSetting(key: string, value: string) {
+export async function setWipLimit(n: number) {
   await requireOwner();
 
+  if (!isValidWipLimit(n)) return { ok: false as const, error: "Giới hạn không hợp lệ" };
+  const value = String(n);
   await db
     .insert(userSettings)
-    .values({ key, value })
+    .values({ key: "wip_limit", value })
     .onConflictDoUpdate({ target: userSettings.key, set: { value } });
   revalidatePath("/settings");
-  return { ok: true };
+  return { ok: true as const };
 }
 
 // ─── GET MULTIPLE ──────────────────────────────────────────────────────────────

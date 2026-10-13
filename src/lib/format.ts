@@ -52,3 +52,12 @@ export const AREA_LABEL: Record<string, string> = { work: "việc", teach: "dạ
 export function dateKey(ms: number = Date.now()): string {
   return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ }).format(ms);
 }
+
+// Che email khi hiển thị (SPEC-UI-P2.5 B06): "minhnn2511@gmail.com" → "minh•••••@gmail.com".
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return "•••••";
+  const local = email.slice(0, at);
+  const keep = local.length > 4 ? 4 : 1; // phần trước @ ngắn thì chỉ giữ 1 ký tự, không lộ cả tên
+  return `${local.slice(0, keep)}•••••${email.slice(at)}`;
+}

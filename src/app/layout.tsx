@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const inter = Inter({
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('jl-theme')||'light';var d=document.documentElement;d.setAttribute('data-theme',t);d.classList.toggle('dark',t==='dark');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`,
+            __html: THEME_SCRIPT,
           }}
         />
         {children}

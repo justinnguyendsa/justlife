@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtDate, fmtDayShort, fmtDuration } from "@/lib/format";
+import { fmtDate, fmtDayShort, fmtDuration, maskEmail } from "@/lib/format";
 
 const vn = (iso: string) => Date.parse(`${iso}+07:00`);
 
@@ -14,5 +14,16 @@ describe("định dạng ngày giờ theo giờ Việt Nam", () => {
     expect(fmtDuration(45)).toBe("45 phút");
     expect(fmtDuration(90)).toBe("1 giờ 30");
     expect(fmtDuration(120)).toBe("2 giờ");
+  });
+});
+
+describe("che email", () => {
+  it("giữ 4 ký tự đầu và tên miền", () => {
+    expect(maskEmail("minhnn2511@gmail.com")).toBe("minh•••••@gmail.com");
+  });
+  it("tên ngắn chỉ giữ 1 ký tự; không có @ thì che hết", () => {
+    expect(maskEmail("abcd@x.vn")).toBe("a•••••@x.vn");
+    expect(maskEmail("ab@x.vn")).toBe("a•••••@x.vn");
+    expect(maskEmail("khongphaiemail")).toBe("•••••");
   });
 });

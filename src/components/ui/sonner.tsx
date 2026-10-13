@@ -6,7 +6,7 @@ import { Toaster as Sonner, type ToasterProps } from "sonner";
 /**
  * Toaster chuẩn shadcn, dùng sonner.
  * justlife không dùng next-themes → đọc trực tiếp data-theme trên <html>
- * (cùng nguồn với ThemeToggle) và theo dõi khi người dùng đổi sáng/tối.
+ * (cùng nguồn với ThemeSetting / lib/theme) và theo dõi khi người dùng đổi sáng/tối.
  */
 function Toaster(props: ToasterProps) {
   const [theme, setTheme] = React.useState<"light" | "dark">("light");
