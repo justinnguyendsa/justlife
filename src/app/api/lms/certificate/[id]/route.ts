@@ -44,7 +44,7 @@ export async function GET(
   const person = (await lmsDb.select({ displayName: lmsPerson.displayName }).from(lmsPerson)
     .where(eq(lmsPerson.id, cert.personId)).limit(1))[0];
   const displayName = safeDecrypt(person?.displayName) ?? "Học viên";
-  const issuedDate = new Date(cert.issuedAt).toLocaleDateString("vi-VN");
+  const issuedDate = new Date(cert.issuedAt).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
 
   // Plain text certificate (PDF stub — sẽ thay bằng PDF render sau)
   const text = [

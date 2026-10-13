@@ -13,9 +13,8 @@ export const dynamic = "force-dynamic";
 // và "Ghi chú & tài liệu" (note + link). Dữ liệu nhỏ → nạp sẵn ở server.
 export default async function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const detail = await getCourseDetail(id);
+  const [detail, files] = await Promise.all([getCourseDetail(id), getFilesForCourse(id)]);
   if (!detail) notFound();
-  const files = await getFilesForCourse(id);
 
   const sub = [detail.course.code, detail.course.term].filter(Boolean).join(" · ") || undefined;
 

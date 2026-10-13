@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import type { FixedSchedule, TimeBlock } from "@/db/schema";
-import { maskHasDate, fixedToRange } from "@/lib/scheduler";
+import { maskHasDate, fixedToRange, startOfDay, vnWeekday, vnDayOfMonth } from "@/lib/scheduler";
 import { fmtTime, fmtDate } from "@/lib/format";
 import { areaSoftClass, areaSolidClass } from "@/lib/areas";
 import { cn } from "@/lib/utils";
@@ -37,11 +37,7 @@ export function CalendarWeekView({
   onDayClick: (day0: number) => void;
 }) {
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
-  const today0 = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }, []);
+  const today0 = useMemo(() => startOfDay(new Date().getTime()), []);
 
   // Tính fixed ranges cho từng ngày
   const fixedByDay = useMemo(() => {
@@ -79,7 +75,6 @@ export function CalendarWeekView({
           className="bg-card sticky top-0 z-[4] h-12 border-b"
         />
         {days.map((day0, i) => {
-          const d = new Date(day0);
           const isToday = day0 === today0;
           return (
             <button
@@ -93,8 +88,8 @@ export function CalendarWeekView({
               )}
               aria-label={`Chuyển sang xem ngày ${fmtDate(day0)}`}
             >
-              <span className="text-[11px] opacity-80">{DAY_NAMES[d.getDay()]}</span>
-              <span className="font-mono text-base font-bold">{String(d.getDate()).padStart(2, "0")}</span>
+              <span className="text-[11px] opacity-80">{DAY_NAMES[vnWeekday(day0)]}</span>
+              <span className="font-mono text-base font-bold">{String(vnDayOfMonth(day0)).padStart(2, "0")}</span>
             </button>
           );
         })}

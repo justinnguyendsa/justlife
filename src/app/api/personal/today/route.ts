@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { task, deadline, timeBlock } from "@/db/schema";
 import { effectiveEscalation, isSnoozed } from "@/lib/escalation";
-import { startOfDay } from "@/lib/scheduler";
+import { parseVnDate, startOfDay } from "@/lib/scheduler";
 import { and, asc, desc, eq, gte, lte, ne, or } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +20,6 @@ type DeadlineWithEffective = {
   task: { id: string; title: string; deadlineAt: number | null };
 };
 
-// Parse YYYY-MM-DD → epoch ms (local midnight)
-function parseDateParam(dateStr: string): number {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.getTime();
-}
-
 export async function GET(req: NextRequest) {
   // P0-T03: gate chu so huu o TANG ROUTE (defense-in-depth, khong chi dua vao middleware).
   const denied = await denyIfNotOwner();
@@ -36,12 +30,10 @@ export async function GET(req: NextRequest) {
     const dateParam = searchParams.get("date");
 
     const now = Date.now();
-    // "Hôm nay" theo Asia/Ho_Chi_Minh — use startOfDay (local server time)
-    let dayStart: number;
-    if (dateParam) {
-      dayStart = parseDateParam(dateParam);
-    } else {
-      dayStart = startOfDay(now);
+    // "Hôm nay" theo giờ Việt Nam (server chạy UTC — xem src/lib/scheduler.ts).
+    const dayStart = dateParam ? parseVnDate(dateParam) : startOfDay(now);
+    if (Number.isNaN(dayStart)) {
+      return NextResponse.json({ error: "Tham số date phải có dạng YYYY-MM-DD" }, { status: 400 });
     }
     const dayEnd = dayStart + 86_400_000; // exclusive end of day
 
