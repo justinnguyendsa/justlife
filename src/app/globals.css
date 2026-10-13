@@ -259,6 +259,14 @@
 .skel { background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%;
   animation: sk 1.2s infinite; border-radius: var(--radius-md); } /* shimmer (không phải gradient trang trí, là skeleton) */
 @keyframes sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+/* Khung chờ khu cá nhân — src/app/(app)/loading.tsx (SPEC-Perf-P1 T10) */
+.app-skel-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.app-skel-title { height: 26px; width: 40%; }
+.app-skel-line { height: 14px; width: 65%; }
+.app-skel-sec { height: 14px; width: 120px; margin-bottom: 12px; }
+.app-skel-stack { display: flex; flex-direction: column; gap: 10px; }
+.app-skel-card { height: 44px; width: 100%; }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 
 /* ===== forms / stepper ===== */
 .field { margin-bottom: var(--space-3); }

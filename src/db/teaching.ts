@@ -1,26 +1,61 @@
-import { asc, desc, eq, and, inArray } from "drizzle-orm";
+import { asc, desc, eq, and, inArray, count } from "drizzle-orm";
 import { lmsDb } from "@/db/lms/client";
 import { tcClass, tcStudent, tcSession, tcAttendance, tcAssignment, tcGrade, tcSubmission, tcMaterial, tcModule, tcLesson, tcCourse } from "@/db/lms/schema";
 import { decryptFieldOpt } from "@/lib/lms/crypto";
+import { assignmentSubmissionStats, classSummary, groupBy, studentProgress } from "@/lib/teaching-stats";
 
+// Đếm học viên + buổi bằng GROUP BY: 3 truy vấn song song thay vì 1+2N (SPEC-Perf-P1 T07).
 export async function listClasses() {
-  const classes = await lmsDb.select().from(tcClass).orderBy(desc(tcClass.createdAt));
-  const out = [];
-  for (const c of classes) {
-    const s = await lmsDb.select().from(tcStudent).where(eq(tcStudent.classId, c.id));
-    const ses = await lmsDb.select().from(tcSession).where(eq(tcSession.classId, c.id));
-    out.push({ ...c, studentCount: s.length, sessionCount: ses.length });
-  }
-  return out;
+  const [classes, studentCounts, sessionCounts] = await Promise.all([
+    lmsDb.select().from(tcClass).orderBy(desc(tcClass.createdAt)),
+    lmsDb.select({ classId: tcStudent.classId, n: count() }).from(tcStudent).groupBy(tcStudent.classId),
+    lmsDb.select({ classId: tcSession.classId, n: count() }).from(tcSession).groupBy(tcSession.classId),
+  ]);
+  const students = new Map(studentCounts.map((r) => [r.classId, r.n]));
+  const sessions = new Map(sessionCounts.map((r) => [r.classId, r.n]));
+  return classes.map((c) => ({ ...c, studentCount: students.get(c.id) ?? 0, sessionCount: sessions.get(c.id) ?? 0 }));
 }
 
 export async function getClassDetail(id: string) {
-  const cls = (await lmsDb.select().from(tcClass).where(eq(tcClass.id, id)).limit(1))[0] ?? null;
+  const [clsRows, students, sessions, assignments] = await Promise.all([
+    lmsDb.select().from(tcClass).where(eq(tcClass.id, id)).limit(1),
+    lmsDb.select().from(tcStudent).where(eq(tcStudent.classId, id)).orderBy(asc(tcStudent.name)),
+    lmsDb.select().from(tcSession).where(eq(tcSession.classId, id)).orderBy(desc(tcSession.dateAt)),
+    lmsDb.select().from(tcAssignment).where(eq(tcAssignment.classId, id)).orderBy(desc(tcAssignment.createdAt)),
+  ]);
+  const cls = clsRows[0] ?? null;
   if (!cls) return null;
-  const students = await lmsDb.select().from(tcStudent).where(eq(tcStudent.classId, id)).orderBy(asc(tcStudent.name));
-  const sessions = await lmsDb.select().from(tcSession).where(eq(tcSession.classId, id)).orderBy(desc(tcSession.dateAt));
-  const assignments = await lmsDb.select().from(tcAssignment).where(eq(tcAssignment.classId, id)).orderBy(desc(tcAssignment.createdAt));
   return { cls, students, sessions, assignments };
+}
+
+/**
+ * Toàn bộ dữ liệu trang chi tiết lớp trong 2 đợt song song, số truy vấn không tăng theo
+ * số buổi / bài tập (SPEC-Perf-P1 T08). Kết quả trùng với các hàm lẻ bên dưới.
+ */
+export async function getClassDetailBundle(id: string) {
+  const [detail, materials] = await Promise.all([getClassDetail(id), getClassMaterials(id)]);
+  if (!detail) return null;
+  const sessionIds = detail.sessions.map((s) => s.id);
+  const assignmentIds = detail.assignments.map((a) => a.id);
+  const studentIds = detail.students.map((s) => s.id);
+
+  const [attendance, grades, submissions] = await Promise.all([
+    sessionIds.length ? lmsDb.select().from(tcAttendance).where(inArray(tcAttendance.sessionId, sessionIds)) : Promise.resolve([]),
+    assignmentIds.length ? lmsDb.select().from(tcGrade).where(inArray(tcGrade.assignmentId, assignmentIds)) : Promise.resolve([]),
+    assignmentIds.length ? lmsDb.select().from(tcSubmission).where(inArray(tcSubmission.assignmentId, assignmentIds)) : Promise.resolve([]),
+  ]);
+  const subs = submissions.map((s) => ({ ...s, originalName: decName(s.originalName) }));
+
+  return {
+    detail,
+    materials,
+    attendanceBySession: groupBy(sessionIds, attendance, (r) => r.sessionId),
+    gradesByAssignment: groupBy(assignmentIds, grades, (r) => r.assignmentId),
+    submissionsByAssignment: groupBy(assignmentIds, subs, (r) => r.assignmentId),
+    summary: classSummary(studentIds, assignmentIds, subs, grades),
+    submissionStats: Object.fromEntries(assignmentIds.map((aid) => [aid, assignmentSubmissionStats(aid, studentIds, subs, grades)])),
+    studentProgress: studentProgress(studentIds, assignmentIds, subs, grades),
+  };
 }
 
 export async function getAttendance(sessionId: string) {
