@@ -3,7 +3,8 @@ import { useMemo } from "react";
 import type { FixedSchedule, TimeBlock } from "@/db/schema";
 import { maskHasDate, fixedToRange, startOfDay, vnWeekday, vnDayOfMonth } from "@/lib/scheduler";
 import { fmtTime, fmtDate } from "@/lib/format";
-import { AREA_VAR } from "@/lib/areas";
+import { areaSoftClass, areaSolidClass } from "@/lib/areas";
+import { cn } from "@/lib/utils";
 
 const START_HOUR = 7;
 const END_HOUR = 23;
@@ -59,7 +60,7 @@ export function CalendarWeekView({
   const gridHeight = HOURS.length * HOUR_PX;
 
   return (
-    <div className="week-view-outer" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+    <div className="bg-card overflow-x-auto rounded-lg border" style={{ WebkitOverflowScrolling: "touch" }}>
       <div
         className="week-grid"
         style={{
@@ -71,45 +72,24 @@ export function CalendarWeekView({
       >
         {/* Header: ô góc trống + 7 cột ngày */}
         <div
-          className="week-header-corner"
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 4,
-            background: "var(--surface)",
-            borderBottom: "1px solid var(--border)",
-            height: 48,
-          }}
+          className="bg-card sticky top-0 z-[4] h-12 border-b"
         />
         {days.map((day0, i) => {
           const isToday = day0 === today0;
           return (
             <button
               key={day0}
-              className={"week-day-header" + (isToday ? " today" : "")}
               onClick={() => onDayClick(day0)}
-              style={{
-                background: isToday ? "var(--accent)" : "var(--surface)",
-                color: isToday ? "#fff" : "var(--text-primary)",
-                border: "none",
-                borderBottom: "1px solid var(--border)",
-                borderLeft: i === 0 ? "1px solid var(--border)" : "none",
-                cursor: "pointer",
-                height: 48,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 2,
-                padding: 0,
-                position: "sticky",
-                top: 0,
-                zIndex: 3,
-              }}
+              aria-current={isToday ? "date" : undefined}
+              className={cn(
+                "sticky top-0 z-[3] flex h-12 cursor-pointer flex-col items-center justify-center gap-0.5 border-b p-0 transition-colors",
+                i === 0 && "border-l",
+                isToday ? "bg-primary-soft text-primary-soft-foreground" : "bg-card text-foreground hover:bg-accent",
+              )}
               aria-label={`Chuyển sang xem ngày ${fmtDate(day0)}`}
             >
-              <span style={{ fontSize: 11, opacity: 0.7 }}>{DAY_NAMES[vnWeekday(day0)]}</span>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>{String(vnDayOfMonth(day0)).padStart(2, "0")}</span>
+              <span className="text-[11px] opacity-80">{DAY_NAMES[vnWeekday(day0)]}</span>
+              <span className="font-mono text-base font-bold">{String(vnDayOfMonth(day0)).padStart(2, "0")}</span>
             </button>
           );
         })}
@@ -117,12 +97,8 @@ export function CalendarWeekView({
         {/* Body: cột giờ + 7 cột ngày */}
         {/* Cột giờ */}
         <div
-          className="week-hour-col"
-          style={{
-            position: "relative",
-            height: gridHeight,
-            borderRight: "1px solid var(--border)",
-          }}
+          className="relative border-r"
+          style={{ height: gridHeight }}
         >
           {HOURS.map((h) => (
             <div
@@ -136,17 +112,11 @@ export function CalendarWeekView({
                 alignItems: "flex-start",
                 paddingTop: 2,
                 justifyContent: "center",
-                borderTop: "1px solid var(--border)",
                 boxSizing: "border-box",
               }}
+              className="border-border/70 border-t"
             >
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "var(--text-secondary)",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
+              <span className="text-muted-foreground font-mono text-[11px]">
                 {String(h).padStart(2, "0")}
               </span>
             </div>
@@ -159,13 +129,8 @@ export function CalendarWeekView({
           return (
             <div
               key={day0}
-              style={{
-                position: "relative",
-                height: gridHeight,
-                borderLeft: "1px solid var(--border)",
-                background: isToday ? "color-mix(in srgb, var(--accent) 4%, transparent)" : undefined,
-                cursor: "pointer",
-              }}
+              style={{ height: gridHeight }}
+              className={cn("relative cursor-pointer border-l", isToday && "bg-primary-soft/40")}
               onClick={() => onDayClick(day0)}
             >
               {/* Kẻ ngang từng giờ */}
@@ -177,9 +142,8 @@ export function CalendarWeekView({
                     top: (h - START_HOUR) * HOUR_PX,
                     left: 0,
                     right: 0,
-                    borderTop: "1px solid var(--border)",
-                    opacity: 0.4,
                   }}
+                  className="border-border/50 border-t"
                 />
               ))}
 
@@ -198,22 +162,15 @@ export function CalendarWeekView({
                       left: 2,
                       right: 2,
                       height,
-                      background: AREA_VAR[f.area] ?? "var(--module-work)",
-                      borderRadius: 4,
-                      padding: "2px 4px",
-                      fontSize: 10,
-                      color: "#fff",
-                      overflow: "hidden",
-                      opacity: 0.75,
                       zIndex: 1,
-                      pointerEvents: "none",
                     }}
+                    className={cn("pointer-events-none overflow-hidden rounded-sm px-1 py-0.5 text-[11px]", areaSoftClass(f.area))}
                   >
                     <span style={{ display: "block", fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {f.label}
                     </span>
                     {height >= 28 && (
-                      <small style={{ fontSize: 9, opacity: 0.85 }}>
+                      <small className="font-mono text-[10px] opacity-85">
                         {fmtTime(f.startAt)}–{fmtTime(f.endAt)}
                       </small>
                     )}
@@ -237,21 +194,15 @@ export function CalendarWeekView({
                       left: 2,
                       right: 2,
                       height,
-                      background: AREA_VAR[b.area] ?? "var(--accent)",
-                      borderRadius: 4,
-                      padding: "2px 4px",
-                      fontSize: 10,
-                      color: "#fff",
-                      overflow: "hidden",
-                      cursor: "pointer",
                       zIndex: 2,
                     }}
+                    className={cn("cursor-pointer overflow-hidden rounded-sm px-1 py-0.5 text-[11px]", areaSolidClass(b.area))}
                   >
                     <span style={{ display: "block", fontWeight: 600, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {b.title}
                     </span>
                     {height >= 28 && (
-                      <small style={{ fontSize: 9, opacity: 0.85 }}>
+                      <small className="font-mono text-[10px] opacity-85">
                         {fmtTime(b.startAt)}–{fmtTime(b.endAt)}
                       </small>
                     )}

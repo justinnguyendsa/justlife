@@ -1,63 +1,38 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { getClassDetail, getAttendance, getGrades, getSubmissions, getClassSummary, getAssignmentSubmissionStats, getStudentProgressInClass, getClassMaterials } from "@/db/teaching";
+import { getClassDetailBundle } from "@/db/teaching";
 import { getFilesForClass } from "@/db/library";
-import type { TcAttendance, TcGrade } from "@/db/lms/schema";
 import { PageHeader } from "@/components/PageHeader";
 import { LinkedFiles } from "@/components/LinkedFiles";
-import { ClassDetailClient, type SubmissionRow } from "./ClassDetailClient";
+import { ClassDetailClient } from "./ClassDetailClient";
 
 export const dynamic = "force-dynamic";
 
 // Chi tiết lớp: tab Học viên · Điểm danh · Chấm bài.
 // MVP single-user: nạp sẵn điểm danh theo từng buổi + điểm theo từng bài tập vào map
 // (dữ liệu nhỏ) để client đổi buổi/bài tập không cần gọi query riêng.
+// Dữ liệu lấy theo số truy vấn cố định, không tăng theo số buổi/bài tập (SPEC-Perf-P1 T08).
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const detail = await getClassDetail(id);
-  if (!detail) notFound();
-
-  const attendanceBySession: Record<string, TcAttendance[]> = {};
-  for (const s of detail.sessions) {
-    attendanceBySession[s.id] = await getAttendance(s.id);
-  }
-
-  const gradesByAssignment: Record<string, TcGrade[]> = {};
-  const submissionsByAssignment: Record<string, SubmissionRow[]> = {};
-  for (const a of detail.assignments) {
-    gradesByAssignment[a.id] = await getGrades(a.id);
-    submissionsByAssignment[a.id] = await getSubmissions(a.id);
-  }
-
-  const files = await getFilesForClass(id);
-
-  const summary = await getClassSummary(id);
-
-  const submissionStats: Record<string, { totalStudents: number; submittedCount: number; pendingGradeCount: number }> = {};
-  for (const a of detail.assignments) {
-    submissionStats[a.id] = await getAssignmentSubmissionStats(a.id, id);
-  }
-
-  const studentProgress = await getStudentProgressInClass(id);
-
-  const materials = await getClassMaterials(id);
+  const [bundle, files] = await Promise.all([getClassDetailBundle(id), getFilesForClass(id)]);
+  if (!bundle) notFound();
 
   return (
     <>
       <Link href="/teaching/classes" className="btn line sm" style={{ marginBottom: 10 }}>
         <ChevronLeft strokeWidth={2} />Tất cả lớp
       </Link>
-      <PageHeader title={detail.cls.name} sub={detail.cls.term ?? undefined} />
+      <PageHeader title={bundle.detail.cls.name} sub={bundle.detail.cls.term ?? undefined} />
       <ClassDetailClient
-        detail={detail}
-        attendanceBySession={attendanceBySession}
-        gradesByAssignment={gradesByAssignment}
-        submissionsByAssignment={submissionsByAssignment}
-        summary={summary}
-        submissionStats={submissionStats}
-        studentProgress={studentProgress}
-        materials={materials}
+        detail={bundle.detail}
+        attendanceBySession={bundle.attendanceBySession}
+        gradesByAssignment={bundle.gradesByAssignment}
+        submissionsByAssignment={bundle.submissionsByAssignment}
+        summary={bundle.summary}
+        submissionStats={bundle.submissionStats}
+        studentProgress={bundle.studentProgress}
+        materials={bundle.materials}
       />
       <LinkedFiles files={files} />
     </>

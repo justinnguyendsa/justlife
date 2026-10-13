@@ -12,9 +12,11 @@ export type DeadlineEntry = {
 
 // Gộp deadline từ Việc (task) + Học (st_item) thành 1 danh sách thống nhất.
 export async function getUnifiedDeadlines(now = Date.now()) {
-  const tasks = await db.select().from(task).where(and(ne(task.status, "done"), isNotNull(task.deadlineAt)));
-  const items = await db.select().from(stItem).where(and(ne(stItem.status, "done"), isNotNull(stItem.dueAt)));
-  const courses = await db.select().from(stCourse);
+  const [tasks, items, courses] = await Promise.all([
+    db.select().from(task).where(and(ne(task.status, "done"), isNotNull(task.deadlineAt))),
+    db.select().from(stItem).where(and(ne(stItem.status, "done"), isNotNull(stItem.dueAt))),
+    db.select().from(stCourse),
+  ]);
   const courseName = Object.fromEntries(courses.map((c) => [c.id, c.name]));
 
   const entries: DeadlineEntry[] = [

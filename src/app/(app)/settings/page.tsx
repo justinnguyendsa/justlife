@@ -9,8 +9,7 @@ import { SettingsClient } from "./SettingsClient";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const fixed = await db.select().from(fixedSchedule);
-  const settings = await getSettings();
+  const [fixed, settings] = await Promise.all([db.select().from(fixedSchedule), getSettings()]);
   const wip = Number(settings.wip_limit ?? "3");
   return (
     <>
