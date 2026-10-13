@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -125,19 +126,22 @@ export function AddTask() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          size="icon"
-          aria-label="Thêm việc"
-          className="fixed right-[18px] bottom-[78px] z-25 size-[54px] rounded-[17px] shadow-lg md:bottom-7 [&_svg:not([class*='size-'])]:size-6"
-        >
-          <Plus strokeWidth={2.2} />
-        </Button>
+      <DialogTrigger
+        render={
+          <Button
+            size="icon"
+            aria-label="Thêm việc"
+            className="fixed right-[18px] bottom-[78px] z-25 size-[54px] rounded-[17px] shadow-lg md:bottom-7 [&_svg:not([class*='size-'])]:size-6"
+          />
+        }
+      >
+        <Plus strokeWidth={2.2} />
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Thêm việc nhanh</DialogTitle>
+          <DialogDescription className="sr-only">Nhập tên việc, chọn mảng, công sức, tác động và hạn. Việc mới vào Hộp việc.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

@@ -96,6 +96,10 @@
   html, body { margin: 0; padding: 0; }
   body {
     @apply bg-background text-foreground;
+    /* Base UI (ADR-005 3c.2): lớp phủ hộp thoại dùng position:absolute trong body relative để phủ kín
+       cả vùng dưới thanh trình duyệt trên iOS 26+ Safari. */
+    position: relative;
+    min-height: 100dvh;
     font-family: var(--font-sans);
     font-size: 15px;
     line-height: 1.5;

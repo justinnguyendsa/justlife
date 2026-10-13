@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { NavLinks } from "@/components/Nav";
 import { AddTask } from "@/components/AddTask";
-import { Toaster } from "@/components/Toaster";
 
 // Khung khu cá nhân (SPEC-UI-P2.0 T05): thanh bên 232px trên web, thanh dưới 5 mục trên điện thoại.
 // Không còn nút gạt "Cá nhân / Dạy học" — dạy học đi qua lối justudy ở thanh bên.
@@ -22,7 +21,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <NavLinks variant="bottom" />
       <AddTask />
-      <Toaster />
     </div>
   );
 }
