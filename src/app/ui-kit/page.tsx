@@ -280,11 +280,13 @@ export default function UiKitPage() {
       </Block>
 
       <Block title="Component thật của app (đã migrate sang shadcn)">
-        <PageHeader
-          title="Hôm nay"
-          sub="Thứ Sáu, 18/09 · 3 việc cần xong"
-          action={<Button size="sm">Xếp lịch</Button>}
-        />
+        <div className="md:px-7">
+          <PageHeader
+            title="Hôm nay"
+            sub="Thứ Sáu, 18/09 · 3 việc cần xong"
+            action={<Button size="sm">Xếp lịch</Button>}
+          />
+        </div>
         <Section color={AREA_VAR.work} title="ĐANG LÀM" cnt="1 việc" />
         <TaskCard
           task={sampleTask({

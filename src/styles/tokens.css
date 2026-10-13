@@ -107,6 +107,10 @@
   --shadow-md: 0 4px 14px oklch(0.2 0.03 252 / 8%);
   --shadow-lg: 0 14px 40px oklch(0.2 0.03 252 / 14%);
 
+  /* Màn Tập trung: nền tối cố định ở CẢ hai chế độ ("tắt bớt thế giới") */
+  --focus-bg: oklch(0.18 0.025 254);
+  --focus-sub: oklch(0.70 0.03 252);
+
   /* Typography (alias cho code cũ) */
   --font-heading: var(--font-sans);
   --font-body: var(--font-sans);

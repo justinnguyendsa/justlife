@@ -32,7 +32,7 @@ Font: Inter (`--font-inter`) + **Geist Mono** (`--font-geist-mono`, mới), nạ
 | T01 | Viết lại token sáng + tối theo Lam & Nắng | `src/styles/tokens.css` |
 | T02 | Nối token mới vào Tailwind (`@theme`); sửa `--font-sans`, thêm `--font-mono` Geist Mono; `--content-max` 1120px | `src/app/globals.css` |
 | T03 | Nạp Geist Mono; `themeColor` theo nền mới | `src/app/layout.tsx` |
-| T04 | Menu mới: `NAV_MAIN` (4 mục), `NAV_FOOT` (justudy ↗, Cài đặt), `BOTTOM_ITEMS` (5 mục); quy tắc tô sáng theo nhóm đường dẫn | `src/components/Nav.tsx` |
+| T04 | Menu mới: `NAV_MAIN` (4 mục), `NAV_FOOT` (justudy ↗, **Tài liệu — tạm tới F1**, Cài đặt), `BOTTOM_ITEMS` (5 mục); quy tắc tô sáng theo nhóm đường dẫn. Việc có nút **Hạn** và **Tập trung** ở thanh tiêu đề (tạm tới P2.2) | `src/components/Nav.tsx`, `src/app/(app)/tasks/page.tsx` |
 | T05 | Khung: thanh bên mới, bỏ `ModeSwitch`, main rộng tối đa 1120px | `src/app/(app)/layout.tsx`, xoá `src/components/ModeSwitch.tsx` |
 | T06 | `PageHeader` thành thanh tiêu đề gọn (desktop: dính trên cùng, 56px, tên + tóm tắt cùng dòng; mobile: tiêu đề lớn) | `src/components/PageHeader.tsx` |
 | T07 | Trang Khác theo IA mới | `src/app/(app)/more/page.tsx` |

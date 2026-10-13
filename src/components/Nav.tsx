@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   CalendarDays,
   ExternalLink,
+  FolderOpen,
   GraduationCap,
   House,
   ListChecks,
@@ -27,9 +28,11 @@ const NAV_MAIN: NavItem[] = [
   { href: "/develop", label: "Cuộc sống", Icon: Sprout, match: ["/develop", "/habits", "/rest", "/study"] },
 ];
 
-// Dạy học còn ở /teaching cho tới khi chuyển hẳn sang justudy (F1).
+// Dạy học và Tài liệu còn ở /teaching, /library cho tới khi chuyển hẳn sang justudy (F1).
+// Khi đó bỏ "Tài liệu" khỏi đây (canvas: thanh bên chỉ còn justudy + Cài đặt).
 const NAV_FOOT: NavItem[] = [
   { href: "/teaching/classes", label: "justudy", Icon: GraduationCap, match: ["/teaching"], external: true },
+  { href: "/library", label: "Tài liệu", Icon: FolderOpen, match: ["/library"] },
   { href: "/settings", label: "Cài đặt", Icon: SlidersHorizontal, match: ["/settings"] },
 ];
 
@@ -95,7 +98,7 @@ export function NavLinks({ variant }: { variant: "side" | "bottom" }) {
     <div className="flex flex-1 flex-col gap-0.5">
       <nav aria-label="Điều hướng chính" className="flex flex-col gap-0.5">{NAV_MAIN.map(link)}</nav>
       <div className="flex-1" />
-      <div className="flex flex-col gap-0.5">{NAV_FOOT.map(link)}</div>
+      <nav aria-label="Điều hướng phụ" className="flex flex-col gap-0.5">{NAV_FOOT.map(link)}</nav>
     </div>
   );
 }
