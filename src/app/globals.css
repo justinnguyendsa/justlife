@@ -15,6 +15,13 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-highlight-soft-foreground: var(--highlight-soft-foreground);
+  --color-overlay: var(--overlay);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -23,10 +30,16 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-soft-foreground: var(--destructive-soft-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -45,6 +58,14 @@
   --color-area-teach-foreground: var(--area-teach-foreground);
   --color-area-study-foreground: var(--area-study-foreground);
   --color-area-growth-foreground: var(--area-growth-foreground);
+  --color-area-work-soft: var(--area-work-soft);
+  --color-area-teach-soft: var(--area-teach-soft);
+  --color-area-study-soft: var(--area-study-soft);
+  --color-area-growth-soft: var(--area-growth-soft);
+  --color-area-work-on: var(--area-work-on);
+  --color-area-teach-on: var(--area-teach-on);
+  --color-area-study-on: var(--area-study-on);
+  --color-area-growth-on: var(--area-growth-on);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -55,8 +76,13 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "Geist Mono", Consolas, monospace;
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  /* Font do next/font tự host (src/app/layout.tsx) — biến chứa tên font đã băm, không ghi tên cứng. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -93,7 +119,7 @@
 :root {
   --brand: var(--primary);
   --brand-600: var(--primary);
-  --brand-weak: var(--accent);
+  --brand-weak: var(--primary-soft);
 
   --bg: var(--background);
   --surface: var(--card);
@@ -105,42 +131,33 @@
   --border-strong: var(--ring);
 
   --danger: var(--destructive);
-  --danger-weak: color-mix(in oklab, var(--destructive) 14%, var(--background));
+  --danger-weak: var(--destructive-soft);
   --ok: var(--success);
-  --ok-weak: color-mix(in oklab, var(--success) 14%, var(--background));
+  --ok-weak: var(--success-soft);
   --warn: var(--warning);
-  --warning-weak: color-mix(in oklab, var(--warning) 18%, var(--background));
+  --warning-weak: var(--warning-soft);
 
   --module-work: var(--area-work);
   --module-teach: var(--area-teach);
   --module-study: var(--area-study);
   --module-growth: var(--area-growth);
-  --work-weak: color-mix(in oklab, var(--area-work) 14%, var(--background));
-  --teach-weak: color-mix(in oklab, var(--area-teach) 14%, var(--background));
-  --study-weak: color-mix(in oklab, var(--area-study) 14%, var(--background));
-  --growth-weak: color-mix(in oklab, var(--area-growth) 18%, var(--background));
+  --work-weak: var(--area-work-soft);
+  --teach-weak: var(--area-teach-soft);
+  --study-weak: var(--area-study-soft);
+  --growth-weak: var(--area-growth-soft);
 
   --on-color: var(--primary-foreground);
-  --ink-deep: oklch(0.208 0.042 265.755);
-  --focus-bg: oklch(0.129 0.042 264.695);
-  --focus-sub: oklch(0.704 0.04 256.788);
+  --ink-deep: var(--foreground);
+  --focus-bg: oklch(0.18 0.025 254);
+  --focus-sub: oklch(0.70 0.03 252);
   --hairline-on: oklch(1 0 0 / 50%);
 
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / .06);
-  --shadow-md: 0 4px 14px oklch(0 0 0 / .08);
-  --shadow-lg: 0 14px 40px oklch(0 0 0 / .14);
-
   --sidebar-w: 232px;
-  --content-max: 880px;
-}
-
-.dark, :root[data-theme="dark"] {
-  --shadow-md: 0 4px 14px oklch(0 0 0 / .3);
-  --shadow-lg: 0 14px 40px oklch(0 0 0 / .45);
+  --content-max: 1120px;
 }
 
 /* ===== responsive shell: sidebar (desktop) ↔ bottom nav (mobile) ===== */

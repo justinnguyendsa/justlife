@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
-// Hub "Phát triển" (trụ #4 — tự cải thiện): 3 lối vào Thói quen · Nghỉ ngơi · Học cao học.
+// Hub "Cuộc sống" (tạm — SPEC-UI-P2.0 T08): 3 lối vào Thói quen · Nghỉ ngơi · Học cao học.
+// Sẽ thay bằng màn tổng quan 6 mảng khi làm F3 (canvas J05).
 // Chỉ là màn điều hướng (không đọc DB) — mỗi mục là 1 card với icon tròn nền màu mảng.
 const HUBS = [
   {
@@ -12,7 +13,7 @@ const HUBS = [
     label: "Thói quen",
     desc: "Thể lực · tiếng Anh · ngủ",
     Icon: Flame,
-    color: "var(--module-growth)",
+    color: "var(--area-growth-foreground)",
     weak: "var(--growth-weak)",
   },
   {
@@ -20,7 +21,7 @@ const HUBS = [
     label: "Nghỉ ngơi",
     desc: "Khối nghỉ · chống burnout",
     Icon: Moon,
-    color: "var(--module-teach)",
+    color: "var(--area-teach-foreground)",
     weak: "var(--teach-weak)",
   },
   {
@@ -28,7 +29,7 @@ const HUBS = [
     label: "Học cao học",
     desc: "Môn · bài tập · ghi chú",
     Icon: BookOpen,
-    color: "var(--module-study)",
+    color: "var(--area-study-foreground)",
     weak: "var(--study-weak)",
   },
 ];
@@ -36,7 +37,7 @@ const HUBS = [
 export default function DevelopPage() {
   return (
     <>
-      <PageHeader title="Phát triển" sub="Tự cải thiện" />
+      <PageHeader title="Cuộc sống" sub="Thói quen · nghỉ ngơi · học" />
 
       <div className="stack">
         {HUBS.map(({ href, label, desc, Icon, color, weak }) => (
@@ -70,7 +71,7 @@ export default function DevelopPage() {
         className="muted"
         style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginTop: 16, lineHeight: 1.5 }}
       >
-        <Sprout strokeWidth={1.8} width={16} height={16} style={{ flex: "none", color: "var(--module-growth)" }} />
+        <Sprout strokeWidth={1.8} width={16} height={16} style={{ flex: "none", color: "var(--area-growth-foreground)" }} />
         Bật so le, đừng ôm hết cùng lúc — mỗi lần thêm một thói quen nhỏ là đủ.
       </div>
     </>

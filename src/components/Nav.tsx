@@ -2,96 +2,100 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Inbox,
   CalendarDays,
-  AlarmClock,
+  ExternalLink,
+  GraduationCap,
+  House,
+  ListChecks,
+  MoreHorizontal,
   SlidersHorizontal,
   Sprout,
-  FolderOpen,
-  MoreHorizontal,
-  Target,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-// Sidebar (desktop): đầy đủ. Bottom-nav (mobile): 4 mục chính + "Khác".
-export const NAV_ITEMS = [
-  { href: "/today", label: "Hôm nay", Icon: LayoutDashboard },
-  { href: "/tasks", label: "Việc", Icon: Inbox },
-  { href: "/focus", label: "Focus", Icon: Target },
-  { href: "/calendar", label: "Lịch", Icon: CalendarDays },
-  { href: "/develop", label: "Phát triển", Icon: Sprout },
-  { href: "/library", label: "Tài liệu", Icon: FolderOpen },
-  { href: "/deadlines", label: "Deadline", Icon: AlarmClock },
-  { href: "/settings", label: "Cài đặt", Icon: SlidersHorizontal },
+// Điều hướng theo IA mới (canvas bản 27, SPEC-UI-P2.0 T04):
+// web = 4 mục chính + lối justudy + Cài đặt; điện thoại = 4 mục chính + "Khác".
+// `match` = các đường dẫn làm mục đó sáng lên (màn con, màn cũ chưa chuyển chỗ).
+type NavItem = { href: string; label: string; Icon: typeof House; match: string[]; external?: boolean };
+
+const NAV_MAIN: NavItem[] = [
+  { href: "/today", label: "Hôm nay", Icon: House, match: ["/today"] },
+  { href: "/tasks", label: "Việc", Icon: ListChecks, match: ["/tasks", "/focus"] },
+  { href: "/calendar", label: "Lịch", Icon: CalendarDays, match: ["/calendar"] },
+  // Tạm trỏ về hub "Phát triển" cho tới khi có màn Cuộc sống thật (F3).
+  { href: "/develop", label: "Cuộc sống", Icon: Sprout, match: ["/develop", "/habits", "/rest", "/study"] },
 ];
 
-const BOTTOM_ITEMS = [
-  { href: "/today", label: "Hôm nay", Icon: LayoutDashboard },
-  { href: "/tasks", label: "Việc", Icon: Inbox },
-  { href: "/focus", label: "Focus", Icon: Target },
-  { href: "/calendar", label: "Lịch", Icon: CalendarDays },
-  { href: "/more", label: "Khác", Icon: MoreHorizontal },
+// Dạy học còn ở /teaching cho tới khi chuyển hẳn sang justudy (F1).
+const NAV_FOOT: NavItem[] = [
+  { href: "/teaching/classes", label: "justudy", Icon: GraduationCap, match: ["/teaching"], external: true },
+  { href: "/settings", label: "Cài đặt", Icon: SlidersHorizontal, match: ["/settings"] },
 ];
-const MORE_PATHS = [
-  "/more",
-  "/develop",
-  "/habits",
-  "/rest",
-  "/study",
-  "/library",
-  "/settings",
-  "/deadlines",
+
+const BOTTOM_ITEMS: NavItem[] = [
+  ...NAV_MAIN,
+  { href: "/more", label: "Khác", Icon: MoreHorizontal, match: ["/more", "/deadlines", "/library", "/settings", "/teaching"] },
 ];
+
+function isActive(path: string, item: NavItem) {
+  return item.match.some((p) => path === p || path.startsWith(p + "/"));
+}
 
 export function NavLinks({ variant }: { variant: "side" | "bottom" }) {
   const path = usePathname();
-  const active = (href: string) => {
-    if (variant === "bottom" && href === "/more") return MORE_PATHS.some((p) => path.startsWith(p));
-    return path === href || path.startsWith(href + "/");
-  };
-  const items = variant === "bottom" ? BOTTOM_ITEMS : NAV_ITEMS;
 
   if (variant === "bottom") {
     return (
-      <nav className="bg-card fixed inset-x-0 bottom-0 z-30 flex h-[62px] border-t md:hidden">
-        {items.map(({ href, label, Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active(href) ? "page" : undefined}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-[3px] text-[10px] font-semibold transition-colors [&_svg]:size-[21px]",
-              active(href) ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            <Icon strokeWidth={1.9} />
-            {label}
-          </Link>
-        ))}
+      <nav aria-label="Điều hướng" className="bg-card fixed inset-x-0 bottom-0 z-30 grid h-[62px] grid-cols-5 border-t md:hidden">
+        {BOTTOM_ITEMS.map((item) => {
+          const on = isActive(path, item);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={on ? "page" : undefined}
+              className={cn(
+                "flex flex-col items-center justify-center gap-[3px] text-[11px] leading-[14px] transition-colors [&_svg]:size-[22px]",
+                on ? "text-foreground font-bold [&_svg]:text-primary" : "text-muted-foreground font-medium"
+              )}
+            >
+              <item.Icon strokeWidth={1.8} aria-hidden="true" />
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
     );
   }
 
+  const link = (item: NavItem) => {
+    const on = isActive(path, item);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={on ? "page" : undefined}
+        aria-label={item.external ? "Mở justudy — học và dạy" : undefined}
+        className={cn(
+          "flex min-h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors [&_svg]:size-5 [&_svg]:shrink-0",
+          on
+            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+            : "text-muted-foreground font-medium hover:bg-accent hover:text-accent-foreground"
+        )}
+      >
+        <item.Icon strokeWidth={1.8} aria-hidden="true" />
+        {item.label}
+        {item.external && <ExternalLink className="ml-auto !size-4" strokeWidth={1.8} aria-hidden="true" />}
+      </Link>
+    );
+  };
+
   return (
-    <>
-      {items.map(({ href, label, Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          aria-current={active(href) ? "page" : undefined}
-          className={cn(
-            "mb-0.5 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors [&_svg]:size-5 [&_svg]:shrink-0",
-            active(href)
-              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-              : "text-muted-foreground hover:bg-sidebar-accent/60"
-          )}
-        >
-          <Icon strokeWidth={1.9} />
-          {label}
-        </Link>
-      ))}
-    </>
+    <div className="flex flex-1 flex-col gap-0.5">
+      <nav aria-label="Điều hướng chính" className="flex flex-col gap-0.5">{NAV_MAIN.map(link)}</nav>
+      <div className="flex-1" />
+      <div className="flex flex-col gap-0.5">{NAV_FOOT.map(link)}</div>
+    </div>
   );
 }

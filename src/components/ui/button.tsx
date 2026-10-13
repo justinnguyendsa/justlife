@@ -9,22 +9,28 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+        // Tối giản (Lam & Nắng): viền thay bóng — không dùng shadow cho nút.
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Vàng nắng = "việc cần làm ngay". Một điểm vàng mỗi màn (justlife).
+        highlight: "bg-highlight text-highlight-foreground hover:bg-highlight/90",
+        soft: "bg-primary-soft text-primary-soft-foreground hover:bg-primary-soft/80",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20",
+        "destructive-ghost": "text-destructive-soft-foreground hover:bg-destructive-soft",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
+          "border bg-card hover:bg-accent hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        success: "bg-success text-success-foreground shadow-xs hover:bg-success/90",
-        warning: "bg-warning text-warning-foreground shadow-xs hover:bg-warning/90",
+        success: "bg-success text-success-foreground hover:bg-success/90",
+        warning: "bg-warning text-warning-foreground hover:bg-warning/90",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
+        default: "h-10 px-4 has-[>svg]:px-3.5",
+        sm: "h-9 rounded-md gap-1.5 px-3 text-[13px] has-[>svg]:px-2.5",
+        lg: "h-11 rounded-md px-6 has-[>svg]:px-4",
+        icon: "size-10",
+        "icon-sm": "size-9",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
