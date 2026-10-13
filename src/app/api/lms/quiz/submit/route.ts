@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { lmsDb } from "@/db/lms/client";
 import { tcQuiz, tcQuizQuestion, tcQuestion, tcQuizAttempt, enrollment } from "@/db/lms/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { genId } from "@/lib/id";
 import { logAccess } from "@/lib/lms/audit";
 import { getSessionStudentId, getMyPersonId } from "@/lib/lms/portal-queries";
+import { decryptFieldOpt, encryptFieldOpt } from "@/lib/lms/crypto";
 
 // P-LMS-3: Quiz submission + auto-grade (ADR-003 QĐ2).
 // correctJson giải mã CHỈ trong bộ nhớ server lúc chấm — KHÔNG bao giờ gửi client.
@@ -15,7 +15,6 @@ function safeDecrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   if (typeof value === "string" && value.startsWith("v1:")) {
     try {
-      const { decryptFieldOpt } = require("@/lib/lms/crypto");
       return decryptFieldOpt(value);
     } catch {
       return value;
@@ -27,7 +26,6 @@ function safeDecrypt(value: string | null | undefined): string | null {
 function safeEncrypt(value: string | null | undefined): string | null {
   if (value == null) return null;
   try {
-    const { encryptFieldOpt } = require("@/lib/lms/crypto");
     return encryptFieldOpt(value) ?? value;
   } catch {
     return value;
