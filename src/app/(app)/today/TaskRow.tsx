@@ -21,6 +21,7 @@ export function TaskRow({
   showFocus = true,
   onOpen,
   selected = false,
+  onDone,
 }: {
   task: Task;
   now: number;
@@ -28,6 +29,7 @@ export function TaskRow({
   showFocus?: boolean;
   onOpen?: () => void;
   selected?: boolean;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -39,6 +41,7 @@ export function TaskRow({
         const r = await setTaskStatus(task.id, "done");
         if (!r.ok) return toast("Chưa lưu được, thử lại nhé", true);
         toast(`Đã xong: ${task.title}`);
+        onDone?.();
         router.refresh();
       } catch {
         toast("Chưa lưu được — kiểm tra kết nối rồi thử lại", true);
@@ -62,6 +65,7 @@ export function TaskRow({
         "bg-card flex items-center gap-3 rounded-lg border transition-colors",
         compact ? "py-2 pr-1 pl-2.5" : "py-2.5 pr-2 pl-3",
         selected && "border-primary ring-primary ring-1",
+        !selected && task.status === "doing" && "border-primary",
         onOpen && !selected && "hover:border-ring",
         pending && "opacity-60",
       )}

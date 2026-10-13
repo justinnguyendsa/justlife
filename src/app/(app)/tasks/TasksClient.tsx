@@ -6,7 +6,7 @@ import type { Task } from "@/db/schema";
 import { AREAS } from "@/lib/areas";
 import { DESKTOP_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { TaskRow } from "../today/TaskRow";
 import { TaskDetail } from "./TaskDetail";
@@ -28,6 +28,7 @@ export function TasksClient({ tasks, now }: { tasks: Task[]; now: number }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
 
+  // Việc đã xong/đã xoá biến khỏi danh sách → coi như đóng; openId cũ bị bỏ khi chọn việc khác hoặc đóng.
   const open = openId ? tasks.find((t) => t.id === openId) ?? null : null;
 
   const { doing, todo, inbox, total } = useMemo(() => {
@@ -45,10 +46,16 @@ export function TasksClient({ tasks, now }: { tasks: Task[]; now: number }) {
   const todoShown = todo.slice(0, limit);
 
   const row = (t: Task) => (
-    <TaskRow key={t.id} task={t} now={now} showFocus={false} selected={t.id === openId} onOpen={() => setOpenId(t.id === openId ? null : t.id)} />
+    <TaskRow key={t.id} task={t} now={now} showFocus={false} selected={t.id === openId} onOpen={() => setOpenId(t.id === openId ? null : t.id)} onDone={() => setOpenId((cur) => (cur === t.id ? null : cur))} />
   );
 
-  const detail = open ? <TaskDetail key={open.id} task={open} onClose={() => setOpenId(null)} headingId="task-detail-h" /> : null;
+  // Rời ô đang gõ (để onBlur tự lưu) rồi mới đóng — Esc / chạm ngoài sheet không làm mất chữ.
+  const close = () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    setOpenId(null);
+  };
+
+  const detail = open ? <TaskDetail key={open.id} task={open} onClose={close} showClose={isDesktop} headingId="task-detail-h" /> : null;
 
   return (
     <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_360px] md:gap-7">
@@ -136,9 +143,10 @@ export function TasksClient({ tasks, now }: { tasks: Task[]; now: number }) {
       </aside>
 
       {/* Điện thoại: sheet từ dưới lên */}
-      <Sheet open={!isDesktop && open != null} onOpenChange={(v) => { if (!v) setOpenId(null); }}>
+      <Sheet open={!isDesktop && open != null} onOpenChange={(v) => { if (!v) close(); }}>
         <SheetContent side="bottom" className="max-h-[88vh] overflow-y-auto rounded-t-[22px] px-5 pt-3 pb-6">
           <SheetTitle className="sr-only">Chi tiết việc</SheetTitle>
+          <SheetDescription className="sr-only">Sửa tên, mảng, ưu tiên, hạn và ghi chú. Mọi thay đổi tự lưu.</SheetDescription>
           {!isDesktop && detail}
         </SheetContent>
       </Sheet>

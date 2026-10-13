@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Play, X } from "lucide-react";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Segmented } from "@/components/Segmented";
 import { cn } from "@/lib/utils";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -25,23 +26,26 @@ const endOfDayVn = (d: string) => Date.parse(`${d}T23:59:59+07:00`);
 
 // Chi tiết việc, tự lưu (SPEC-UI-P2.2 F04): ô chữ lưu khi rời ô, lựa chọn lưu ngay.
 // Dùng chung cho cột phải (web) và sheet (điện thoại). Cha đặt key={task.id} để reset khi đổi việc.
-export function TaskDetail({ task, onClose, headingId }: { task: Task; onClose?: () => void; headingId: string }) {
+// `onClose`: đóng chi tiết (cả sau khi xoá). `showClose`: hiện nút X (sheet đã có nút đóng riêng).
+export function TaskDetail({ task, onClose, showClose = true, headingId }: { task: Task; onClose?: () => void; showClose?: boolean; headingId: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [state, setState] = useState<SaveState>("idle");
   const [title, setTitle] = useState(task.title);
   const [note, setNote] = useState(task.note ?? "");
   const [area, setArea] = useState(task.area);
-  const [effort, setEffort] = useState(task.effort ?? 3);
-  const [impact, setImpact] = useState(task.impact ?? 3);
+  const [effort, setEffort] = useState<number | null>(task.effort);
+  const [impact, setImpact] = useState<number | null>(task.impact);
+  // Xếp hàng các lần lưu: tránh 2 lần lưu chạy song song làm điểm ưu tiên tính trên dữ liệu cũ.
+  const queue = useRef<Promise<void>>(Promise.resolve());
   const [due, setDue] = useState(task.deadlineAt ? dateKey(task.deadlineAt) : "");
 
   const deadlineAt = due ? endOfDayVn(due) : null;
   const score = calcPriorityScore({ effort, impact, deadlineAt });
 
-  const save = (patch: Patch) =>
-    start(async () => {
-      setState("saving");
+  const save = (patch: Patch) => {
+    setState("saving");
+    const run = async () => {
       try {
         const r = await updateTask(task.id, patch);
         if (!r.ok) {
@@ -55,7 +59,9 @@ export function TaskDetail({ task, onClose, headingId }: { task: Task; onClose?:
         setState("error");
         toast("Chưa lưu được — kiểm tra kết nối rồi thử lại", true);
       }
-    });
+    };
+    queue.current = queue.current.then(run);
+  };
 
   const saveTitle = () => {
     const v = title.trim();
@@ -86,7 +92,8 @@ export function TaskDetail({ task, onClose, headingId }: { task: Task; onClose?:
     if (!confirm(`Xoá việc "${task.title}"? Không hoàn tác được.`)) return;
     start(async () => {
       try {
-        await deleteTask(task.id);
+        const r = await deleteTask(task.id);
+        if (r && "ok" in r && !r.ok) return toast("error" in r && r.error ? r.error : "Chưa xoá được, thử lại nhé", true);
         toast("Đã xoá việc");
         onClose?.();
         router.refresh();
@@ -109,7 +116,7 @@ export function TaskDetail({ task, onClose, headingId }: { task: Task; onClose?:
             </span>
           )}
         </h2>
-        {onClose && (
+        {onClose && showClose && (
           <Button variant="ghost" size="icon" className="size-11 md:size-10" aria-label="Đóng chi tiết" onClick={onClose}>
             <X aria-hidden="true" />
           </Button>
@@ -141,16 +148,19 @@ export function TaskDetail({ task, onClose, headingId }: { task: Task; onClose?:
       <div className="grid grid-cols-2 gap-3">
         <fieldset className="flex flex-col gap-1.5">
           <legend className="mb-1.5 text-sm font-medium">Công sức</legend>
-          <Segmented options={LEVELS.map((n) => ({ value: String(n), label: String(n) }))} value={String(effort)} onChange={(v) => { setEffort(+v); save({ effort: +v }); }} ariaLabel="Công sức" />
+          <Segmented options={LEVELS.map((n) => ({ value: String(n), label: String(n) }))} value={effort == null ? "" : String(effort)} onChange={(v) => { setEffort(+v); save({ effort: +v }); }} ariaLabel="Công sức" />
         </fieldset>
         <fieldset className="flex flex-col gap-1.5">
           <legend className="mb-1.5 text-sm font-medium">Tác động</legend>
-          <Segmented options={LEVELS.map((n) => ({ value: String(n), label: String(n) }))} value={String(impact)} onChange={(v) => { setImpact(+v); save({ impact: +v }); }} ariaLabel="Tác động" />
+          <Segmented options={LEVELS.map((n) => ({ value: String(n), label: String(n) }))} value={impact == null ? "" : String(impact)} onChange={(v) => { setImpact(+v); save({ impact: +v }); }} ariaLabel="Tác động" />
         </fieldset>
       </div>
 
       <div className="bg-card flex items-center justify-between rounded-lg border px-4 py-3">
-        <span className="text-[13px]">Điểm ưu tiên</span>
+        <span className="flex flex-col">
+          <span className="text-[13px]">Điểm ưu tiên</span>
+          {score == null && <span className="text-muted-foreground text-xs">Chọn cả Công sức và Tác động để tính điểm</span>}
+        </span>
         <span className="text-primary font-mono text-[15px] font-bold">{score ?? "—"}</span>
       </div>
 
@@ -161,7 +171,13 @@ export function TaskDetail({ task, onClose, headingId }: { task: Task; onClose?:
           type="date"
           className="font-mono"
           value={due}
-          onChange={(e) => { setDue(e.target.value); save({ deadlineAt: e.target.value ? endOfDayVn(e.target.value) : null }); }}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDue(v);
+            // Chỉ lưu khi xoá hạn hoặc ngày đã đủ (năm ≥ 2000) — tránh lưu lúc đang gõ dở năm.
+            if (v === "") save({ deadlineAt: null });
+            else if (/^\d{4}-\d{2}-\d{2}$/.test(v) && +v.slice(0, 4) >= 2000) save({ deadlineAt: endOfDayVn(v) });
+          }}
         />
       </div>
 
@@ -189,32 +205,6 @@ export function TaskDetail({ task, onClose, headingId }: { task: Task; onClose?:
       <Button variant="destructive-ghost" className="h-11 self-start px-2 md:h-10" onClick={remove} disabled={pending}>
         Xoá việc
       </Button>
-    </div>
-  );
-}
-
-// Nhóm nút chọn 1 (role radio) — dùng cho mảng, công sức, tác động.
-function Segmented({ options, value, onChange, ariaLabel }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void; ariaLabel: string }) {
-  return (
-    <div role="radiogroup" aria-label={ariaLabel} className="bg-muted grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] p-[3px]">
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => { if (!on) onChange(o.value); }}
-            className={cn(
-              "min-h-11 rounded-md px-1 text-[13px] font-semibold transition-colors md:min-h-[34px]",
-              on ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
     </div>
   );
 }

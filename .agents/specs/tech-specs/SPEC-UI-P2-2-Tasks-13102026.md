@@ -27,7 +27,7 @@ depends_on: SPEC-UI-P2.1 (nhánh ui/p2-1-today)
 | F07 | `/deadlines` chuyển hướng sang `/tasks?tab=han`. Sửa link ở Hôm nay và trang Khác | `src/app/(app)/deadlines/page.tsx`, `today/page.tsx`, `more/page.tsx` |
 | F08 | Bỏ nút tạm "Hạn" và "Tập trung" ở thanh tiêu đề Việc (P2.0). Tập trung vào qua nút Bắt đầu và Hôm nay | `src/app/(app)/tasks/page.tsx` |
 | F09 | Hook `useMediaQuery` để chọn cột phải hay sheet | `src/lib/use-media-query.ts` |
-| F10 | Dòng việc dùng chung với Hôm nay (`TaskRow`), thêm chế độ `selectable` | `src/app/(app)/today/TaskRow.tsx` |
+| F10 | Dòng việc dùng chung với Hôm nay (`TaskRow`): thêm prop `onOpen`, `selected`, `showFocus`, `onDone`. Việc đang làm có viền lam | `src/app/(app)/today/TaskRow.tsx` |
 
 ## Quy tắc tự lưu
 - **Ô chữ** (tên, ghi chú): lưu khi rời ô hoặc nhấn Enter (riêng với tên). Không lưu nếu giá trị không đổi.
@@ -35,7 +35,9 @@ depends_on: SPEC-UI-P2.1 (nhánh ui/p2-1-today)
 - **Chọn** (mảng, công sức, tác động) và **hạn**: lưu ngay khi đổi.
 - **Chữ trạng thái**: "Đang lưu…" → "Đã lưu" → "Chưa lưu được" (kèm toast).
 - Điểm ưu tiên trên giao diện tính bằng `calcPriorityScore` giống server.
-- Hạn dùng `endOfVnDate(yyyy-mm-dd)` nếu nhánh múi giờ ([justinnguyendsa/justlife#4](https://github.com/justinnguyendsa/justlife/pull/4)) đã merge. Trước đó giữ cách cũ (`T23:59:59` giờ trình duyệt). Ghi chú cho lần rebase.
+- Hạn = `Date.parse("YYYY-MM-DDT23:59:59+07:00")` (23:59:59 giờ VN, không phụ thuộc trình duyệt). Hiển thị bằng `dateKey`. Chỉ lưu khi ngày đủ và năm ≥ 2000.
+- Công sức và Tác động chưa đặt thì để trống. Điểm chỉ có khi đặt đủ cả hai.
+- Các lần lưu được xếp hàng tuần tự ở client.
 
 ## QC
 - `tsc`, `vitest`, `next build` đều qua. Lint không thêm lỗi.
