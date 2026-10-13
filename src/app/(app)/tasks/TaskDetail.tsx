@@ -11,7 +11,7 @@ import { AREAS } from "@/lib/areas";
 import { dateKey } from "@/lib/format";
 import { endOfVnDate } from "@/lib/scheduler";
 import { toast } from "@/components/Toaster";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -198,9 +198,9 @@ export function TaskDetail({ task, onClose, showClose = true, headingId }: { tas
           <Play className="fill-current" aria-hidden="true" />
           {task.status === "doing" ? "Tiếp tục tập trung" : "Bắt đầu"}
         </Button>
-        <Button asChild variant="outline" className="h-11 flex-1 md:h-10">
-          <Link href="/calendar"><CalendarPlus aria-hidden="true" />Xếp vào lịch</Link>
-        </Button>
+        <Link href="/calendar" className={cn(buttonVariants({ variant: "outline" }), "h-11 flex-1 md:h-10")}>
+          <CalendarPlus aria-hidden="true" />Xếp vào lịch
+        </Link>
       </div>
       <Button variant="destructive-ghost" className="h-11 self-start px-2 md:h-10" onClick={remove} disabled={pending}>
         Xoá việc
