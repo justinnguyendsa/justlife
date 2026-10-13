@@ -5,10 +5,10 @@ import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { OVERLAY_CLOSE_CLASS, type WithClassName } from "./shared";
 
 // Sheet = Dialog của Base UI trượt từ cạnh (ADR-005 3c.2; registry base của shadcn cũng dựng Sheet trên Dialog).
 // Trạng thái: data-open / data-closed. Lớp phủ dùng token --overlay. Nút X có vùng chạm 44px trên điện thoại.
-type WithClassName<P> = Omit<P, "className"> & { className?: string };
 
 function Sheet(props: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root {...props} />;
@@ -66,7 +66,7 @@ function SheetContent({
         {children}
         <SheetPrimitive.Close
           data-slot="sheet-close"
-          className="focus-visible:ring-ring/50 absolute top-2 right-2 grid size-11 place-items-center rounded-md opacity-70 transition-opacity outline-none hover:opacity-100 focus-visible:ring-[3px] disabled:pointer-events-none md:top-3 md:right-3 md:size-8"
+          className={OVERLAY_CLOSE_CLASS}
         >
           <XIcon className="size-4" />
           <span className="sr-only">Đóng</span>
