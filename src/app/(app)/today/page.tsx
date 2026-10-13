@@ -4,9 +4,9 @@ import { getUnifiedDeadlines, type DeadlineEntry } from "@/db/deadlines";
 import { getRest, listHabits } from "@/db/habits";
 import { PageHeader } from "@/components/PageHeader";
 import { AddTaskButton } from "@/components/AddTaskButton";
-import { Badge } from "@/components/ui/badge";
-import { countdown, fmtDayShort, fmtDuration, fmtTime } from "@/lib/format";
-import { areaBadge, areaSoftClass, areaSolidClass, areaTitle } from "@/lib/areas";
+import { DueItem } from "@/components/DueItem";
+import { fmtDayShort, fmtDuration, fmtTime } from "@/lib/format";
+import { areaSoftClass, areaSolidClass } from "@/lib/areas";
 import { fixedToRange, maskHasDate, startOfDay } from "@/lib/scheduler";
 import { freeSlots } from "@/lib/day-slots";
 import { cn } from "@/lib/utils";
@@ -78,22 +78,11 @@ export default async function TodayPage() {
           <section aria-labelledby="today-due" className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <h2 id="today-due" className="text-[15px] font-semibold">Hạn sắp tới</h2>
-              <Link href="/deadlines" className="text-primary text-[13px] font-semibold">Xem tất cả hạn</Link>
+              <Link href="/tasks?tab=han" className="text-primary text-[13px] font-semibold">Xem tất cả hạn</Link>
             </div>
             {due48.length ? (
               <ul className="bg-card overflow-hidden rounded-lg border">
-                {due48.slice(0, 5).map((e) => {
-                  const c = countdown(e.dueAt, now);
-                  return (
-                    <li key={e.source + e.id} className="border-b last:border-b-0">
-                      <Link href={e.href} className="hover:bg-accent flex min-h-12 items-center gap-3 px-4 py-2.5 transition-colors">
-                        <Badge variant={c.level === "over" ? "danger" : "warn"} className="font-mono">{c.label}</Badge>
-                        <span className="min-w-0 flex-1 truncate text-sm">{e.title}</span>
-                        <Badge variant={areaBadge(e.area)} className="hidden sm:inline-flex">{e.source === "study" ? e.sub : areaTitle(e.area)}</Badge>
-                      </Link>
-                    </li>
-                  );
-                })}
+                {due48.slice(0, 5).map((e) => <DueItem key={e.source + e.id} e={e} now={now} />)}
               </ul>
             ) : (
               <p className="text-muted-foreground text-[13px]">Không có hạn nào trong 48 giờ tới.</p>
