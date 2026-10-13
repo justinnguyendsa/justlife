@@ -24,6 +24,10 @@ export async function loginWithCode(
   } catch (err) {
     // Lỗi xác thực của Auth.js (sai/hết hạn/khóa) → thông báo CHUNG.
     if (err instanceof AuthError) {
+      // Nhập sai quá nhiều từ nơi này → báo chờ (không lộ mã có tồn tại hay không) — SPEC-SEC-1.2 M2.
+      if ((err as { code?: string }).code === "rate_limited") {
+        return { error: "Bạn đã nhập sai nhiều lần. Thử lại sau ít phút nhé." };
+      }
       return { error: "Mã không hợp lệ hoặc đã hết hạn. Vui lòng kiểm tra lại." };
     }
     // Mọi thứ khác (gồm redirect thành công) → để Next xử lý.

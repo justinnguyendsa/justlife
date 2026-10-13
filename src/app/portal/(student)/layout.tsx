@@ -35,6 +35,9 @@ export default async function StudentShell({ children }: { children: React.React
 
   async function doSignOut() {
     "use server";
+    const { cookies } = await import("next/headers");
+    const { LINK_INTENT_COOKIE } = await import("@/lib/lms/link-intent");
+    (await cookies()).delete({ name: LINK_INTENT_COOKIE, path: "/api/auth" }); // SPEC-SEC-1.2 H1
     await signOut({ redirectTo: "/portal/login" });
   }
 

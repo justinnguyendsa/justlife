@@ -40,7 +40,9 @@ export type AuditAction =
   | "create_thread"
   | "create_post"
   | "hide_post"
-  | "self_enrol";
+  | "self_enrol"
+  | "link_gmail"
+  | "unlink_gmail";
 
 export type AuditTargetType =
   | "grade"

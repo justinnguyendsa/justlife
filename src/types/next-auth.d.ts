@@ -9,12 +9,14 @@ declare module "next-auth" {
     lmsUserId?: string;
     isMinor?: boolean;
     role?: string;
+    accessCodeId?: string;
     user?: DefaultSession["user"];
   }
   interface User {
     studentId?: string;
     lmsUserId?: string;
     isMinor?: boolean;
+    accessCodeId?: string;
   }
 }
 
@@ -24,5 +26,7 @@ declare module "next-auth/jwt" {
     lmsUserId?: string;
     isMinor?: boolean;
     role?: string;
+    accessCodeId?: string;
+    loginAt?: number;
   }
 }

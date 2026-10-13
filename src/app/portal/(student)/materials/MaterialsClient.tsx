@@ -33,10 +33,12 @@ export default function MaterialsClient({
   classNameById,
 }: Props) {
   const [completed, setCompleted] = useState<Set<string>>(() => new Set(initialCompletedArr));
+  const [progressError, setProgressError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   async function toggleComplete(materialId: string) {
     const isCompleted = completed.has(materialId);
+    setProgressError(null);
     startTransition(async () => {
       try {
         const res = await fetch("/api/lms/material-progress", {
@@ -51,9 +53,12 @@ export default function MaterialsClient({
             else next.add(materialId);
             return next;
           });
+        } else {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          setProgressError(body?.error ?? "Chưa lưu được tiến độ, thử lại nhé.");
         }
       } catch {
-        /* ignore — trạng thái giữ nguyên */
+        setProgressError("Chưa lưu được — kiểm tra kết nối rồi thử lại.");
       }
     });
   }
@@ -74,6 +79,11 @@ export default function MaterialsClient({
 
   return (
     <>
+      {progressError && (
+        <div className="portal-err" role="alert" style={{ marginBottom: 12 }}>
+          <span>{progressError}</span>
+        </div>
+      )}
       <div className="portal-hello">
         <h1>Tài liệu lớp</h1>
         <p className="sub">Tài liệu &amp; bài giảng giảng viên chia sẻ cho lớp của bạn.</p>
