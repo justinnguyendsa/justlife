@@ -12,6 +12,8 @@ describe("giới hạn đang làm", () => {
     expect(parseWipLimit("-1")).toBe(3);
     expect(parseWipLimit("1.5")).toBe(3);
     expect(parseWipLimit("11")).toBe(3);
+    expect(parseWipLimit("10")).toBe(10);
+    expect(parseWipLimit("")).toBe(3);
   });
   it("kiểm tra giá trị được phép lưu", () => {
     expect(isValidWipLimit(0)).toBe(true);

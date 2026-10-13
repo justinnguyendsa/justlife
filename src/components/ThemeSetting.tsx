@@ -1,7 +1,7 @@
 "use client";
 import { useSyncExternalStore } from "react";
 
-import { THEME_EVENT, applyThemePref, isThemePref, readThemePref } from "@/lib/theme";
+import { THEME_EVENT, THEME_KEY, applyThemePref, isThemePref, readThemePref, repaintFromStorage } from "@/lib/theme";
 import { Segmented } from "@/components/Segmented";
 
 const OPTIONS = [
@@ -11,11 +11,16 @@ const OPTIONS = [
 ];
 
 function subscribe(cb: () => void) {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== THEME_KEY) return;
+    repaintFromStorage();
+    cb();
+  };
   window.addEventListener(THEME_EVENT, cb);
-  window.addEventListener("storage", cb);
+  window.addEventListener("storage", onStorage);
   return () => {
     window.removeEventListener(THEME_EVENT, cb);
-    window.removeEventListener("storage", cb);
+    window.removeEventListener("storage", onStorage);
   };
 }
 

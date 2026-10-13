@@ -51,7 +51,8 @@ export default async function MorePage() {
 
         <section aria-labelledby="more-fixed" className="flex flex-col gap-2">
           <h2 id="more-fixed" className="text-[13px] font-bold">Giờ bận cố định</h2>
-          <Link href="/settings" aria-label="Sửa giờ bận trong Cài đặt" className="flex flex-col gap-2">
+          <Link href="/settings" className="flex flex-col gap-2">
+            <span className="sr-only">Mở Cài đặt để sửa giờ bận:</span>
             {fixed.length === 0 ? (
               <span className="bg-card text-muted-foreground hover:bg-accent rounded-lg border px-3 py-3 text-[13px] transition-colors">
                 Chưa có giờ bận nào — thêm trong Cài đặt

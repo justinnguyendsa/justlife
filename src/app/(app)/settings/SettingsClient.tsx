@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 
 import type { FixedSchedule } from "@/db/schema";
@@ -26,24 +26,29 @@ const WIP_OPTIONS = [
 export function SettingsClient({ fixed, wip, account }: { fixed: FixedSchedule[]; wip: number; account: Account }) {
   const [editing, setEditing] = useState<FixedSchedule | "new" | null>(null);
   const [w, setW] = useState(String(wip));
+  const saved = useRef(String(wip)); // giá trị server đã nhận gần nhất
+  const latest = useRef(String(wip)); // lựa chọn mới nhất của người dùng
   const [, start] = useTransition();
 
   // Giá trị cũ ngoài 1/2/3/không giới hạn (vd. 5) vẫn hiện để không mất.
   const wipOptions = WIP_OPTIONS.some((o) => o.value === w) ? WIP_OPTIONS : [...WIP_OPTIONS.slice(0, 3), { value: w, label: w }, WIP_OPTIONS[3]];
 
   const saveWip = (v: string) => {
-    const prev = w;
+    latest.current = v;
     setW(v);
+    // Lỗi chỉ trả về giá trị đã lưu khi đây vẫn là lựa chọn mới nhất (bấm nhanh 2 lần không bị lệch).
+    const revert = () => { if (latest.current === v) { latest.current = saved.current; setW(saved.current); } };
     start(async () => {
       try {
         const r = await setWipLimit(Number(v));
         if (!r.ok) {
-          setW(prev);
+          revert();
           return toast(r.error, true);
         }
+        saved.current = v;
         toast(v === "0" ? "Đã bỏ giới hạn việc đang làm" : `Tối đa ${v} việc đang làm cùng lúc`);
       } catch {
-        setW(prev);
+        revert();
         toast("Chưa lưu được — kiểm tra kết nối rồi thử lại", true);
       }
     });

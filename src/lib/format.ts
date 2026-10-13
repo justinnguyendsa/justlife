@@ -27,6 +27,12 @@ export function fmtDuration(minutes: number): string {
   return m === 0 ? `${h} giờ` : `${h} giờ ${String(m).padStart(2, "0")}`;
 }
 
+// "HH:MM" → số phút trong ngày; sai định dạng → NaN (để validate báo "Giờ không hợp lệ").
+export function hhmmToMin(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : NaN;
+}
+
 export function minToHHMM(min: number): string {
   const h = Math.floor(min / 60), m = min % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;

@@ -23,12 +23,21 @@ export function readThemePref(): ThemePref {
   }
 }
 
-export function applyThemePref(pref: ThemePref) {
+function paint(pref: ThemePref) {
   const systemDark = typeof window.matchMedia === "function" && window.matchMedia(DARK_QUERY).matches;
   const t = resolveTheme(pref, systemDark);
   const d = document.documentElement;
   d.setAttribute("data-theme", t);
   d.classList.toggle("dark", t === "dark");
+}
+
+/** Tab khác vừa đổi lựa chọn (sự kiện `storage`): chỉ tô lại màu, không ghi đè bộ nhớ. */
+export function repaintFromStorage() {
+  paint(readThemePref());
+}
+
+export function applyThemePref(pref: ThemePref) {
+  paint(pref);
   memoryPref = pref;
   try {
     localStorage.setItem(THEME_KEY, pref);

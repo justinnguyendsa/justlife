@@ -23,6 +23,10 @@ describe("khung giờ bận cố định", () => {
     expect(err({ endMin: 510 })).toBe("Giờ kết thúc phải sau giờ bắt đầu");
     expect(err({ weekdayMask: 0 })).toBe("Chọn ít nhất một ngày lặp lại");
     expect(err({ weekdayMask: 128 })).toBe("Chọn ít nhất một ngày lặp lại");
+    expect(err({ startMin: NaN })).toBe("Giờ không hợp lệ");
+    expect(err({ endMin: 400 })).toBe("Giờ kết thúc phải sau giờ bắt đầu");
+    expect(err({ label: "x".repeat(80) })).toBeNull();
+    expect(err({ weekdayMask: 127 })).toBeNull();
   });
   it("ghi ngày lặp lại gọn", () => {
     expect(weekdayRange(0b0011111)).toBe("T2–T6");

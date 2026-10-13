@@ -8,7 +8,7 @@ import { deleteTimeBlock, updateTimeBlock } from "@/app/actions/schedule";
 import { setTaskStatus } from "@/app/actions/tasks";
 import { detectConflicts, startOfDay } from "@/lib/scheduler";
 import { areaBadge, areaTitle } from "@/lib/areas";
-import { fmtTime } from "@/lib/format";
+import { fmtTime, hhmmToMin } from "@/lib/format";
 import { toast } from "@/components/Toaster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,11 +23,6 @@ const DURATIONS = [
   { value: "90", label: "1 giờ 30" },
   { value: "120", label: "2 giờ" },
 ];
-
-const toMin = (hhmm: string) => {
-  const [h, m] = hhmm.split(":").map(Number);
-  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : NaN;
-};
 
 // Bảng "Khối đang chọn" (SPEC-UI-P2.3 F04): đổi giờ, chọn nhanh thời lượng, kiểm trùng tại chỗ,
 // Lưu · Đánh dấu xong (nếu gắn việc) · Xoá. Cha đặt key={block.id} để reset khi đổi khối.
@@ -52,8 +47,8 @@ export function BlockEditor({
   const [endHHMM, setEndHHMM] = useState(fmtTime(block.endAt));
 
   const day0 = startOfDay(block.startAt);
-  const sMin = toMin(startHHMM);
-  const eMin = toMin(endHHMM);
+  const sMin = hhmmToMin(startHHMM);
+  const eMin = hhmmToMin(endHHMM);
   const valid = Number.isFinite(sMin) && Number.isFinite(eMin) && eMin > sMin;
   const startAt = day0 + sMin * 60_000;
   const endAt = day0 + eMin * 60_000;
