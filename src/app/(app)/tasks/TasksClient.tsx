@@ -1,313 +1,159 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+
 import type { Task } from "@/db/schema";
-import { updateTask, deleteTask, setTaskStatus } from "@/app/actions/tasks";
-import { calcPriorityScore } from "@/lib/priority";
-import { AREA_VAR, AREA_LABEL } from "@/lib/areas";
-import { countdown } from "@/lib/format";
-import { toast } from "@/components/Toaster";
+import { AREAS } from "@/lib/areas";
+import { DESKTOP_QUERY, useMediaQuery } from "@/lib/use-media-query";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+import { TaskRow } from "../today/TaskRow";
+import { TaskDetail } from "./TaskDetail";
 
-// Bộ lọc theo mảng đời sống (US-02). "all" = không lọc.
-const AREA_FILTERS: { key: string; label: string }[] = [
-  { key: "all", label: "Tất cả" },
-  { key: "work", label: "Việc" },
-  { key: "teach", label: "Dạy" },
-  { key: "study", label: "Học" },
-  { key: "growth", label: "Bản thân" },
-];
-
-// Trạng thái có thể đặt từ sheet (US-02 AC-02-4). "done" tự ẩn việc khỏi list.
-const STATUSES: { key: string; label: string }[] = [
-  { key: "todo", label: "Cần làm" },
-  { key: "doing", label: "Đang làm" },
-  { key: "done", label: "Xong" },
-];
-
-// T17 — số việc mỗi trang
 const PAGE_SIZE = 20;
+const FILTERS = [{ key: "all", label: "Tất cả mảng" }, ...AREAS];
 
 // Bỏ dấu để tìm kiếm không phân biệt dấu — gõ "bao cao" vẫn ra "báo cáo" (US-02 edge case).
 function fold(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/đ/g, "d").trim();
 }
 
-export function TasksClient({ initial, wipLimit }: { initial: Task[]; wipLimit: number }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+// Tab "Tất cả" của Việc (SPEC-UI-P2.2 F03): tìm + lọc mảng, 3 nhóm, chi tiết ở cột phải (web)
+// hoặc sheet từ dưới lên (điện thoại).
+export function TasksClient({ tasks, now }: { tasks: Task[]; now: number }) {
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const [q, setQ] = useState("");
   const [area, setArea] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [effort, setEffort] = useState(3);
-  const [impact, setImpact] = useState(3);
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
-  // T15 — edit states cho sheet
-  const [editTitle, setEditTitle] = useState("");
-  const [editNote, setEditNote] = useState("");
-  const [editDeadline, setEditDeadline] = useState("");
-
-  // T17 — phân trang
-  const [page, setPage] = useState(1);
-
-  // Server là nguồn sự thật; mỗi refresh() trả `initial` mới → đồng bộ lại view.
-  const tasks = initial;
   const open = openId ? tasks.find((t) => t.id === openId) ?? null : null;
 
-  // Số việc "đang làm" hiện tại — dùng cho cảnh báo WIP mềm (US-04 AC-04-1/04-5).
-  const doingCount = useMemo(() => tasks.filter((t) => t.status === "doing").length, [tasks]);
-
-  // Khi mở 1 việc: nạp Effort/Impact/Title/Note/Deadline hiện có.
-  useEffect(() => {
-    if (!open) return;
-    setEffort(open.effort ?? 3);
-    setImpact(open.impact ?? 3);
-    setEditTitle(open.title);
-    setEditNote(open.note ?? "");
-    setEditDeadline(
-      open.deadlineAt ? new Date(open.deadlineAt).toISOString().split("T")[0] : ""
-    );
-  }, [open]);
-
-  // Đóng sheet bằng phím Esc (desktop).
-  useEffect(() => {
-    if (!openId) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpenId(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [openId]);
-
-  const filtered = useMemo(() => {
+  const { doing, todo, inbox, total } = useMemo(() => {
     const fq = fold(q);
-    return tasks.filter((t) => {
-      if (area !== "all" && t.area !== area) return false;
-      if (fq && !fold(t.title).includes(fq)) return false;
-      return true;
-    });
+    const list = tasks.filter((t) => (area === "all" || t.area === area) && (!fq || fold(t.title).includes(fq)));
+    return {
+      doing: list.filter((t) => t.status === "doing"),
+      todo: list.filter((t) => t.status !== "doing" && t.priorityScore != null),
+      inbox: list.filter((t) => t.status !== "doing" && t.priorityScore == null),
+      total: list.length,
+    };
   }, [tasks, q, area]);
 
-  // T17 — reset page khi filter thay đổi
-  useEffect(() => setPage(1), [q, area]);
+  // Phân trang chỉ áp cho nhóm Cần làm (dài nhất); Đang làm và Hộp việc thường ngắn.
+  const todoShown = todo.slice(0, limit);
 
-  // T17 — slice theo trang
-  const paged = filtered.slice(0, page * PAGE_SIZE);
+  const row = (t: Task) => (
+    <TaskRow key={t.id} task={t} now={now} showFocus={false} selected={t.id === openId} onOpen={() => setOpenId(t.id === openId ? null : t.id)} />
+  );
 
-  // Điểm ưu tiên tự tính ngay khi chỉnh Effort/Impact (US-03 AC-03-5), giữ deadline hiện có.
-  const liveScore = open
-    ? calcPriorityScore({
-        effort,
-        impact,
-        deadlineAt: editDeadline
-          ? new Date(editDeadline + "T23:59:59").getTime()
-          : open.deadlineAt,
-      })
-    : null;
-
-  // T16 — changeStatus dùng wipLimit từ prop, toast cảnh báo nếu wip_exceeded
-  function changeStatus(t: Task, status: string) {
-    start(async () => {
-      const res = await setTaskStatus(t.id, status);
-      if (res.ok === false && res.wip_exceeded) {
-        toast(
-          `Đang làm ${res.current}/${res.limit} việc — vượt giới hạn WIP`,
-          true
-        );
-        return;
-      }
-      if (status === "done") setOpenId(null);
-      router.refresh();
-      toast(status === "done" ? "Đã đánh dấu xong" : `Đã chuyển: ${labelOf(status)}`);
-    });
-  }
-
-  // T15 — saveAll: lưu toàn bộ fields (title, note, effort, impact, deadline)
-  function saveAll(t: Task) {
-    if (editTitle.trim() === "") {
-      toast("Vui lòng nhập tiêu đề", true);
-      return;
-    }
-    const newDeadlineAt = editDeadline
-      ? new Date(editDeadline + "T23:59:59").getTime()
-      : null;
-    start(async () => {
-      const res = await updateTask(t.id, {
-        title: editTitle.trim(),
-        note: editNote.trim() || undefined,
-        effort,
-        impact,
-        deadlineAt: newDeadlineAt,
-      });
-      if (res.ok === false && res.wip_exceeded) {
-        toast(
-          `Đang làm ${res.current}/${res.limit} việc — vượt giới hạn WIP`,
-          true
-        );
-        return; // không đóng sheet
-      }
-      if (!res.ok) {
-        toast(res.error ?? "Lưu thất bại", true);
-        return;
-      }
-      setOpenId(null);
-      router.refresh();
-      toast("Lưu thành công");
-    });
-  }
-
-  // T15 — xóa việc với confirm
-  function handleDelete(t: Task) {
-    if (!confirm("Xóa việc này?")) return;
-    start(async () => {
-      await deleteTask(t.id);
-      setOpenId(null);
-      router.refresh();
-      toast("Đã xóa việc");
-    });
-  }
+  const detail = open ? <TaskDetail key={open.id} task={open} onClose={() => setOpenId(null)} headingId="task-detail-h" /> : null;
 
   return (
-    <>
-      <div className="search">
-        <Search strokeWidth={1.8} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm việc theo tên..." aria-label="Tìm việc" />
-      </div>
-
-      <div className="filters">
-        {AREA_FILTERS.map((f) => (
-          <button key={f.key} className={"fil" + (area === f.key ? " on" : "")} onClick={() => setArea(f.key)}>{f.label}</button>
-        ))}
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="empty">
-          {tasks.length === 0
-            ? "Chưa có việc nào — nhấn nút + để thêm việc đầu tiên."
-            : q.trim()
-              ? `Không tìm thấy việc nào khớp "${q.trim()}".`
-              : "Không có việc nào trong mảng này."}
-        </div>
-      ) : (
-        <div style={{ marginTop: 10 }}>
-          {paged.map((t) => {
-            const dl = t.deadlineAt != null ? countdown(t.deadlineAt) : null;
-            return (
-              <button key={t.id} className="task card" onClick={() => setOpenId(t.id)}>
-                <span className="bar" style={{ background: AREA_VAR[t.area] }} />
-                <div className="b">
-                  <div className="t">{t.title}</div>
-                  <div className="meta">
-                    <span className={`chip ${t.area}`}>{AREA_LABEL[t.area]}</span>
-                    {t.status === "doing" && <span className="chip st doing">đang làm</span>}
-                    {dl && <span className={"chip dl" + (dl.level === "over" ? " over" : "")}>{dl.label}</span>}
-                    {t.priorityScore != null && <span className="chip score">{t.priorityScore} điểm</span>}
-                    {t.priorityScore == null && <span className="chip st">chưa ưu tiên</span>}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-
-          {/* T17 — nút Xem thêm */}
-          {filtered.length > paged.length && (
-            <button className="btn ghost block" onClick={() => setPage((p) => p + 1)}>
-              Xem thêm ({filtered.length - paged.length} việc nữa)
-            </button>
-          )}
-        </div>
-      )}
-
-      {open && (
-        <div className="scrim" onClick={(e) => { if (e.target === e.currentTarget) setOpenId(null); }}>
-          <div className="sheet" role="dialog" aria-label="Chi tiết việc">
-
-            {/* T15 — edit title */}
-            <div className="field">
-              <label>Tiêu đề</label>
-              <input
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                placeholder="Tiêu đề việc..."
-              />
-            </div>
-
-            {/* T15 — edit note */}
-            <div className="field" style={{ marginTop: 8 }}>
-              <label>Ghi chú</label>
-              <textarea
-                value={editNote}
-                onChange={(e) => setEditNote(e.target.value)}
-                placeholder="Ghi chú (tùy chọn)..."
-                rows={3}
-              />
-            </div>
-
-            <div className="setrow">
-              <div><div className="l">Mảng</div><div className="d">phân loại đời sống</div></div>
-              <span className={`chip ${open.area}`}>{AREA_LABEL[open.area]}</span>
-            </div>
-
-            {/* T15 — edit deadline */}
-            <div className="field" style={{ marginTop: 8 }}>
-              <label>Hạn chót</label>
-              <input
-                type="date"
-                value={editDeadline}
-                onChange={(e) => setEditDeadline(e.target.value)}
-              />
-            </div>
-
-            <div className="row2" style={{ marginTop: 12 }}>
-              <div className="setrow" style={{ border: "none", padding: "4px 0" }}>
-                <div className="l">Effort</div>
-                <div className="stepper">
-                  <button onClick={() => setEffort((v) => Math.max(1, v - 1))} aria-label="Giảm effort">–</button>
-                  <span className="v">{effort}</span>
-                  <button onClick={() => setEffort((v) => Math.min(5, v + 1))} aria-label="Tăng effort">+</button>
-                </div>
-              </div>
-              <div className="setrow" style={{ border: "none", padding: "4px 0" }}>
-                <div className="l">Impact</div>
-                <div className="stepper">
-                  <button onClick={() => setImpact((v) => Math.max(1, v - 1))} aria-label="Giảm impact">–</button>
-                  <span className="v">{impact}</span>
-                  <button onClick={() => setImpact((v) => Math.min(5, v + 1))} aria-label="Tăng impact">+</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="scorebox"><span>Điểm ưu tiên (tự tính)</span><span className="n">{liveScore ?? "—"}</span></div>
-
-            <div className="field" style={{ marginTop: 4 }}>
-              <label>Trạng thái</label>
-              <div className="seg">
-                {STATUSES.map((s) => (
-                  <button key={s.key} className={open.status === s.key ? "on" : ""} disabled={pending} onClick={() => changeStatus(open, s.key)}>{s.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* T15 — buttons: Đóng + Lưu + Xóa */}
-            <div className="row2" style={{ marginTop: 8 }}>
-              <button className="btn line block" disabled={pending} onClick={() => setOpenId(null)}>Đóng</button>
-              <button className="btn primary block" disabled={pending} onClick={() => saveAll(open)}>{pending ? "Đang lưu..." : "Lưu"}</button>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <button
-                className="btn ghost block"
-                disabled={pending}
-                onClick={() => handleDelete(open)}
-                style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
-              >
-                Xóa việc
-              </button>
-            </div>
+    <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_360px] md:gap-7">
+      <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="relative md:w-[260px]">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
+            <Input
+              type="search"
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setLimit(PAGE_SIZE); }}
+              placeholder="Tìm việc"
+              aria-label="Tìm việc theo tên"
+              className="h-11 pl-9 md:h-9"
+            />
+          </div>
+          <div role="group" aria-label="Lọc theo mảng" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+            {FILTERS.map((f) => {
+              const on = area === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => { setArea(f.key); setLimit(PAGE_SIZE); }}
+                  className={cn(
+                    "min-h-11 shrink-0 rounded-sm border px-3 text-[13px] font-semibold whitespace-nowrap transition-colors md:min-h-8",
+                    on ? "bg-primary-soft text-primary-soft-foreground border-transparent" : "bg-card text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
-    </>
+
+        {total === 0 ? (
+          <p className="text-muted-foreground rounded-lg border border-dashed p-5 text-[13px]">
+            {tasks.length === 0
+              ? "Chưa có việc nào — bấm Thêm việc (phím N) để ghi việc đầu tiên."
+              : q.trim()
+                ? `Không tìm thấy việc nào khớp "${q.trim()}".`
+                : "Không có việc nào trong mảng này."}
+          </p>
+        ) : (
+          <>
+            {doing.length > 0 && (
+              <Group id="g-doing" title="Đang làm">{doing.map(row)}</Group>
+            )}
+            {todo.length > 0 && (
+              <Group id="g-todo" title="Cần làm" note="xếp theo điểm ưu tiên">
+                {todoShown.map(row)}
+                {todo.length > todoShown.length && (
+                  <button
+                    type="button"
+                    onClick={() => setLimit((n) => n + PAGE_SIZE)}
+                    className="text-primary hover:bg-accent min-h-11 rounded-md text-[13px] font-semibold"
+                  >
+                    Xem thêm ({todo.length - todoShown.length} việc nữa)
+                  </button>
+                )}
+              </Group>
+            )}
+            {inbox.length > 0 && (
+              <Group id="g-inbox" title="Hộp việc — chưa ưu tiên" note={`${inbox.length} việc`}>{inbox.map(row)}</Group>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Web: chi tiết ở cột phải, dính khi cuộn */}
+      <aside
+        aria-labelledby={open ? "task-detail-h" : undefined}
+        aria-label={open ? undefined : "Chi tiết việc"}
+        className="hidden md:block"
+      >
+        <div className="bg-popover sticky top-[72px] max-h-[calc(100vh-88px)] overflow-y-auto rounded-lg border p-5">
+          {isDesktop && detail ? (
+            detail
+          ) : (
+            <p className="text-muted-foreground text-[13px]">Chọn một việc để xem và sửa chi tiết. Mọi thay đổi tự lưu.</p>
+          )}
+        </div>
+      </aside>
+
+      {/* Điện thoại: sheet từ dưới lên */}
+      <Sheet open={!isDesktop && open != null} onOpenChange={(v) => { if (!v) setOpenId(null); }}>
+        <SheetContent side="bottom" className="max-h-[88vh] overflow-y-auto rounded-t-[22px] px-5 pt-3 pb-6">
+          <SheetTitle className="sr-only">Chi tiết việc</SheetTitle>
+          {!isDesktop && detail}
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
 
-function labelOf(status: string): string {
-  return STATUSES.find((s) => s.key === status)?.label ?? status;
+function Group({ id, title, note, children }: { id: string; title: string; note?: string; children: React.ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <h2 id={id} className="text-[15px] font-semibold">{title}</h2>
+        {note && <span className="text-muted-foreground text-xs">{note}</span>}
+      </div>
+      {children}
+    </section>
+  );
 }

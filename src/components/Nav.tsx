@@ -22,7 +22,7 @@ type NavItem = { href: string; label: string; Icon: typeof House; match: string[
 
 const NAV_MAIN: NavItem[] = [
   { href: "/today", label: "Hôm nay", Icon: House, match: ["/today"] },
-  { href: "/tasks", label: "Việc", Icon: ListChecks, match: ["/tasks", "/focus"] },
+  { href: "/tasks", label: "Việc", Icon: ListChecks, match: ["/tasks", "/focus", "/deadlines"] },
   { href: "/calendar", label: "Lịch", Icon: CalendarDays, match: ["/calendar"] },
   // Tạm trỏ về hub "Phát triển" cho tới khi có màn Cuộc sống thật (F3).
   { href: "/develop", label: "Cuộc sống", Icon: Sprout, match: ["/develop", "/habits", "/rest", "/study"] },
@@ -38,7 +38,7 @@ const NAV_FOOT: NavItem[] = [
 
 const BOTTOM_ITEMS: NavItem[] = [
   ...NAV_MAIN,
-  { href: "/more", label: "Khác", Icon: MoreHorizontal, match: ["/more", "/deadlines", "/library", "/settings", "/teaching"] },
+  { href: "/more", label: "Khác", Icon: MoreHorizontal, match: ["/more", "/library", "/settings", "/teaching"] },
 ];
 
 function isActive(path: string, item: NavItem) {

@@ -12,8 +12,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Hàng việc ưu tiên ở Hôm nay (SPEC-UI-P2.1 T03): ▶ bắt đầu tập trung, ✓ đánh dấu xong.
-export function TaskRow({ task, now, compact = false }: { task: Task; now: number; compact?: boolean }) {
+// Hàng việc dùng chung (SPEC-UI-P2.1 T03, P2.2 F10): ▶ bắt đầu tập trung, ✓ đánh dấu xong.
+// `onOpen` (màn Việc): bấm vào tên/vùng nội dung để mở chi tiết; `selected` tô viền lam.
+export function TaskRow({
+  task,
+  now,
+  compact = false,
+  showFocus = true,
+  onOpen,
+  selected = false,
+}: {
+  task: Task;
+  now: number;
+  compact?: boolean;
+  showFocus?: boolean;
+  onOpen?: () => void;
+  selected?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const dl = task.deadlineAt != null ? countdown(task.deadlineAt, now) : null;
@@ -46,27 +61,41 @@ export function TaskRow({ task, now, compact = false }: { task: Task; now: numbe
       className={cn(
         "bg-card flex items-center gap-3 rounded-lg border transition-colors",
         compact ? "py-2 pr-1 pl-2.5" : "py-2.5 pr-2 pl-3",
+        selected && "border-primary ring-primary ring-1",
+        onOpen && !selected && "hover:border-ring",
         pending && "opacity-60",
       )}
     >
       <span aria-hidden="true" className={cn("w-1 shrink-0 self-stretch rounded-sm", areaBarClass(task.area))} />
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className={cn("font-semibold", compact ? "text-sm leading-5" : "text-[15px] leading-[22px]")}>{task.title}</span>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant={areaBadge(task.area)}>{areaTitle(task.area)}</Badge>
-          {dl && (
-            <Badge variant={dl.level === "over" ? "danger" : dl.level === "warn" ? "warn" : "outline"} className="font-mono">
-              {dl.label}
-            </Badge>
-          )}
-        </div>
-      </div>
+      {(() => {
+        const body = (
+          <>
+            <span className={cn("font-semibold", compact ? "text-sm leading-5" : "text-[15px] leading-[22px]")}>{task.title}</span>
+            <span className="flex flex-wrap gap-1.5">
+              <Badge variant={areaBadge(task.area)}>{areaTitle(task.area)}</Badge>
+              {dl && (
+                <Badge variant={dl.level === "over" ? "danger" : dl.level === "warn" ? "warn" : "outline"} className="font-mono">
+                  {dl.label}
+                </Badge>
+              )}
+              {task.priorityScore == null && task.status !== "done" && <Badge variant="outline">chưa ưu tiên</Badge>}
+            </span>
+          </>
+        );
+        return onOpen ? (
+          <button type="button" onClick={onOpen} aria-expanded={selected} className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left">
+            {body}
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">{body}</div>
+        );
+      })()}
       {!compact && task.priorityScore != null && (
         <span className="text-primary w-8 text-right font-mono text-[15px] font-bold" title="Điểm ưu tiên">
           {task.priorityScore}
         </span>
       )}
-      {!compact && (
+      {!compact && showFocus && (
         <Button variant="ghost" size="icon" className="size-11 md:size-10" aria-label={`Bắt đầu tập trung: ${task.title}`} onClick={startFocus} disabled={pending}>
           <Play className="fill-current" aria-hidden="true" />
         </Button>

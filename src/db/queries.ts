@@ -44,6 +44,11 @@ export async function getCalendarData(dayMs = Date.now()) {
   return { day0, fixed, blocks, tasks };
 }
 
+// Việc đã xong gần nhất (tab "Đã xong" của Việc — SPEC-UI-P2.2 B02).
+export async function listDoneTasks(limit = 50) {
+  return db.select().from(task).where(eq(task.status, "done")).orderBy(desc(task.doneAt)).limit(limit);
+}
+
 export async function getDeadlinesData(now = Date.now()) {
   const rows = await db.select().from(task)
     .where(and(ne(task.status, "done"), isNotNull(task.deadlineAt))).orderBy(asc(task.deadlineAt));

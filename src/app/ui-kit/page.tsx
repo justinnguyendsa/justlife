@@ -40,6 +40,10 @@ import { NowCard } from "@/app/(app)/today/NowCard";
 import { TaskRow } from "@/app/(app)/today/TaskRow";
 import { HabitsToday } from "@/app/(app)/today/HabitsToday";
 import { RestToday } from "@/app/(app)/today/RestToday";
+import { TaskTabs } from "@/app/(app)/tasks/TaskTabs";
+import { TasksClient } from "@/app/(app)/tasks/TasksClient";
+import { TaskDetail } from "@/app/(app)/tasks/TaskDetail";
+import { DoneList } from "@/app/(app)/tasks/DoneList";
 
 export const metadata: Metadata = {
   title: "Bộ UI · justlife",
@@ -303,6 +307,25 @@ export default function UiKitPage() {
               <RestToday todayMin={15} />
             </div>
           </div>
+        </div>
+      </Block>
+
+      <Block title="Việc — thành phần P2.2 (dữ liệu mẫu, chỉ để xem — đã khoá bấm)">
+        <div inert className="flex flex-col gap-6">
+          <TaskTabs active="tat-ca" dueCount={2} />
+          <TasksClient
+            now={NOW}
+            tasks={[
+              sampleTask({ id: "t1", title: "Chuẩn bị báo cáo doanh thu tuần", status: "doing", priorityScore: 93, deadlineAt: NOW + 2 * 3600_000 }),
+              sampleTask({ id: "t2", title: "Chấm bài tập lớp Python buổi 5", area: "teach", priorityScore: 88, deadlineAt: NOW + 5 * 3600_000 }),
+              sampleTask({ id: "t3", title: "Đọc chương 4 — Hồi quy logistic", area: "study", priorityScore: 74, deadlineAt: NOW + 2 * 86_400_000 }),
+              sampleTask({ id: "t4", title: "Gia hạn thẻ thư viện trường", area: "growth", priorityScore: null, effort: null, impact: null }),
+            ]}
+          />
+          <div className="bg-popover max-w-[360px] rounded-lg border p-5">
+            <TaskDetail headingId="uikit-td" task={sampleTask({ id: "t2", title: "Chấm bài tập lớp Python buổi 5", area: "teach", effort: 2, impact: 5, priorityScore: 88, deadlineAt: NOW + 5 * 3600_000, note: "Nhắc bạn Minh An nộp bù bài buổi 4." })} />
+          </div>
+          <DoneList tasks={[sampleTask({ id: "d1", title: "Gửi biên bản họp KPI", status: "done", doneAt: NOW - 86_400_000 })]} />
         </div>
       </Block>
 
