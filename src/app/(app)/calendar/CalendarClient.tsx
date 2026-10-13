@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { CalendarClock, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { FixedSchedule, TimeBlock, Task } from "@/db/schema";
 import { createTimeBlock } from "@/app/actions/schedule";
-import { fixedToRange, maskHasDate, startOfDay, type Conflict } from "@/lib/scheduler";
+import { fixedToRange, maskHasDate, startOfDay, startOfWeek, type Conflict } from "@/lib/scheduler";
 import { freeSlots } from "@/lib/day-slots";
 import { fmtDate, fmtDayShort, fmtDuration, fmtTime } from "@/lib/format";
 import { AREAS } from "@/lib/areas";
@@ -21,15 +21,8 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { BlockEditor } from "./BlockEditor";
 
-// ─── Helper: lấy thứ Hai đầu tuần chứa `ms` (local time) ───────────────────
-export function getMonday(ms: number): number {
-  const d = new Date(ms);
-  const day = d.getDay(); // 0=CN
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
+// Thứ Hai đầu tuần chứa `ms`, theo giờ Việt Nam (khớp với server).
+const getMonday = startOfWeek;
 
 const DAY_MS = 86_400_000;
 const DURATIONS = [

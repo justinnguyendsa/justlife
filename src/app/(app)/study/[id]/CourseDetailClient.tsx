@@ -9,6 +9,7 @@ import {
   createNote, deleteNote,
 } from "@/app/actions/study";
 import { countdown, fmtDate } from "@/lib/format";
+import { endOfVnDate } from "@/lib/scheduler";
 import { toast } from "@/components/Toaster";
 
 // Kiểu trả về của getCourseDetail (đã loại null vì page cha gọi notFound()).
@@ -69,7 +70,7 @@ function ItemsTab({ courseId, items, pending, start, router }: {
     if (!t) { toast("Nhập tên bài/đồ án", true); return; }
     let dueAt: number | null = null;
     if (due) {
-      const ms = new Date(due + "T23:59:59").getTime(); // hết ngày deadline
+      const ms = endOfVnDate(due); // hết ngày deadline
       if (Number.isNaN(ms)) { toast("Hạn nộp không hợp lệ", true); return; }
       dueAt = ms;
     }

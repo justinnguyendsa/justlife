@@ -1,22 +1,12 @@
 import { and, asc, gte, lte, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { fixedSchedule, timeBlock, task } from "@/db/schema";
-import { startOfDay } from "@/lib/scheduler";
+import { startOfDay, startOfWeek } from "@/lib/scheduler";
 import { CalendarClient } from "./CalendarClient";
 
 export const dynamic = "force-dynamic";
 
 const DAY = 86_400_000;
-
-// Lấy Thứ Hai đầu tuần (server-side)
-function getMonday(ms: number): number {
-  const d = new Date(ms);
-  const day = d.getDay(); // 0=CN
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
 
 // Màn "Lịch" (US-05, S7): xem khối cố định hôm nay + time-block (việc đã xếp),
 // kéo-thả để đổi giờ (desktop) / chạm-đặt (mobile). Đọc dữ liệu phía server,
@@ -42,7 +32,7 @@ export default async function CalendarPage({
   let rangeEnd: number;
   if (weekStartParam) {
     const ws = parseInt(weekStartParam, 10);
-    day0 = getMonday(isNaN(ws) ? now : ws);
+    day0 = startOfWeek(isNaN(ws) ? now : ws);
     rangeEnd = day0 + 7 * DAY;
   } else if (dayParam) {
     const dayMs = parseInt(dayParam, 10);

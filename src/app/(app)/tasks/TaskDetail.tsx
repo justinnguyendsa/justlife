@@ -9,6 +9,7 @@ import { deleteTask, setTaskStatus, updateTask } from "@/app/actions/tasks";
 import { calcPriorityScore } from "@/lib/priority";
 import { AREAS } from "@/lib/areas";
 import { dateKey } from "@/lib/format";
+import { endOfVnDate } from "@/lib/scheduler";
 import { toast } from "@/components/Toaster";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,6 @@ type Patch = Parameters<typeof updateTask>[1];
 
 const LEVELS = [1, 2, 3, 4, 5];
 // "YYYY-MM-DD" → 23:59:59 giờ Việt Nam (hạn chót "hết ngày").
-const endOfDayVn = (d: string) => Date.parse(`${d}T23:59:59+07:00`);
 
 // Chi tiết việc, tự lưu (SPEC-UI-P2.2 F04): ô chữ lưu khi rời ô, lựa chọn lưu ngay.
 // Dùng chung cho cột phải (web) và sheet (điện thoại). Cha đặt key={task.id} để reset khi đổi việc.
@@ -40,7 +40,7 @@ export function TaskDetail({ task, onClose, showClose = true, headingId }: { tas
   const queue = useRef<Promise<void>>(Promise.resolve());
   const [due, setDue] = useState(task.deadlineAt ? dateKey(task.deadlineAt) : "");
 
-  const deadlineAt = due ? endOfDayVn(due) : null;
+  const deadlineAt = due ? endOfVnDate(due) : null;
   const score = calcPriorityScore({ effort, impact, deadlineAt });
 
   const save = (patch: Patch) => {
@@ -176,7 +176,7 @@ export function TaskDetail({ task, onClose, showClose = true, headingId }: { tas
             setDue(v);
             // Chỉ lưu khi xoá hạn hoặc ngày đã đủ (năm ≥ 2000) — tránh lưu lúc đang gõ dở năm.
             if (v === "") save({ deadlineAt: null });
-            else if (/^\d{4}-\d{2}-\d{2}$/.test(v) && +v.slice(0, 4) >= 2000) save({ deadlineAt: endOfDayVn(v) });
+            else if (/^\d{4}-\d{2}-\d{2}$/.test(v) && +v.slice(0, 4) >= 2000) save({ deadlineAt: endOfVnDate(v) });
           }}
         />
       </div>
