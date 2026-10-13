@@ -13,8 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
   const now = Date.now();
-  const { doing, top, blocks, fixed } = await getTodayData(now);
-  const { next24h } = await getUnifiedDeadlines(now);
+  const [{ doing, top, blocks, fixed }, { next24h }] = await Promise.all([getTodayData(now), getUnifiedDeadlines(now)]);
   const day0 = startOfDay(now);
   const dayDate = new Date(day0);
   const timeline = [

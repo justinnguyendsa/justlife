@@ -1,7 +1,6 @@
 import { and, asc, gte, lte, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { fixedSchedule, timeBlock, task } from "@/db/schema";
-import type { TimeBlock } from "@/db/schema";
 import { startOfDay } from "@/lib/scheduler";
 import { PageHeader } from "@/components/PageHeader";
 import { CalendarClient } from "./CalendarClient";
@@ -36,44 +35,33 @@ export default async function CalendarPage({
   const params = searchParams ? await searchParams : {};
   const now = Date.now();
 
-  const fixed = await db.select().from(fixedSchedule);
-  const tasks = await db.select().from(task).where(ne(task.status, "done")).orderBy();
-
-  let day0: number;
-  let blocks: TimeBlock[];
-
   const weekStartParam = typeof params.weekStart === "string" ? params.weekStart : undefined;
   const dayParam = typeof params.day === "string" ? params.day : undefined;
 
+  // Khoảng thời gian cần tải: cả tuần (WeekView), 1 ngày chỉ định, hoặc hôm nay (mặc định).
+  let day0: number;
+  let rangeEnd: number;
   if (weekStartParam) {
-    // WeekView: tải blocks cho cả 7 ngày của tuần
     const ws = parseInt(weekStartParam, 10);
-    const weekMonday = getMonday(isNaN(ws) ? now : ws);
-    day0 = weekMonday;
-    const weekEnd = weekMonday + 7 * DAY;
-    blocks = await db
-      .select()
-      .from(timeBlock)
-      .where(and(gte(timeBlock.startAt, weekMonday), lte(timeBlock.startAt, weekEnd)))
-      .orderBy(asc(timeBlock.startAt));
+    day0 = getMonday(isNaN(ws) ? now : ws);
+    rangeEnd = day0 + 7 * DAY;
   } else if (dayParam) {
-    // DayView: tải blocks của 1 ngày
     const dayMs = parseInt(dayParam, 10);
     day0 = startOfDay(isNaN(dayMs) ? now : dayMs);
-    blocks = await db
-      .select()
-      .from(timeBlock)
-      .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY)))
-      .orderBy(asc(timeBlock.startAt));
+    rangeEnd = day0 + DAY;
   } else {
-    // Mặc định: ngày hôm nay
     day0 = startOfDay(now);
-    blocks = await db
-      .select()
-      .from(timeBlock)
-      .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, day0 + DAY)))
-      .orderBy(asc(timeBlock.startAt));
+    rangeEnd = day0 + DAY;
   }
+
+  // 3 truy vấn độc lập chạy song song (SPEC-Perf-P1 T04).
+  const [fixed, tasks, blocks] = await Promise.all([
+    db.select().from(fixedSchedule),
+    db.select().from(task).where(ne(task.status, "done")).orderBy(),
+    db.select().from(timeBlock)
+      .where(and(gte(timeBlock.startAt, day0), lte(timeBlock.startAt, rangeEnd)))
+      .orderBy(asc(timeBlock.startAt)),
+  ]);
 
   return (
     <>
